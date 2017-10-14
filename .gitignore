@@ -1,0 +1,27 @@
+*.csv
+*.json
+*.DS_Store
+*.pyc
+.ipynb_checkpoints/
+tmp-*
+tmp/
+data/
+
+
+## latex
+*.bak
+*.bbl
+*.out
+*.blg
+*.aux
+*.backup
+*.bk
+*.dvi
+*.nav
+*.snm
+*.toc
+*.vrb
+
+## sphinx
+*_build
+*_static
