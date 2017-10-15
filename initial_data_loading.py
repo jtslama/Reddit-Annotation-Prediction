@@ -25,8 +25,48 @@ def load_discourse_data(filepath):
     return df
 
 
+
+
 def load_reddit_data(filepath):
-    pass
+    """
+    Since I keep doing it, and its a pain every time:
+    The steps necessary to take the file of a list of json objects and compile it
+    into a pandas DataFrame
+    """
+    filepath = 'data/RC_2008-11'
+    # read file into a list
+    with open(filepath, 'r') as f:
+        rows = f.readlines()
+    # remove newline chars, change true (invalid) to True (bool), false to False, null to None
+    # for r in rows:
+    #     r = r.rstrip()
+    #     r = r.replace('true', 'True')
+    #     r = r.replace('false', 'False')
+    #     r = r.replace('null', 'None')
+    switch = {'true': 'True', 'false': 'False', 'null': 'None'}
+    for item in switch:
+        rows = [r.replace(item, switch[item]) for r in rows]
+    rows = [r.rstrip() for r in rows]
+    # now each string can be made to a dictionary
+    dictified = [ast.literal_eval(rf) for rf in rows]
+    # then loaded into a pandas DataFrame
+    df = pd.DataFrame(dictified)
+    return df
+
+df = load_reddit_data(filepath)
+df.columns
+df[df.author == 'ironpony'].head(1)
+len(df.subreddit_id.unique())
+
+
+
+%cd /Users/jt/Desktop/Galvanize/DSI_Capstone/
+filepath = 'data/RC_2008-11'
+df = load_discourse_data(filepath)
+with open(filepath, 'r') as f:
+    rows = f.readlines()
+type(rows[0])
+rows[0]
 
 """
 Note:
@@ -98,7 +138,7 @@ class Reddit_Post_Date_Finder(object):
         dates = []
         for i, url in enumerate(url_list):
             html_text = _query_site(url)
-            print("{}/{}/n").format(i, len(url_list))            
+            print("{}/{}/n").format(i, len(url_list))
             date = _parse_html(html_text)
             #TODO need to further refine date (Either here or in above fn)
             dates.append(date)
@@ -116,6 +156,10 @@ if __name__ == '__main__':
     df = load_discourse_data(orig_json_file)
     df.head()
     len(df)
+
+    # looking at a small sample of reddit data
+
+
     # small test case (to test scraper)
     urls = df.url.tolist()[:10]
     Finder = Reddit_Post_Date_Finder()
