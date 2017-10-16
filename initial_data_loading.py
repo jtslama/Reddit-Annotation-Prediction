@@ -38,12 +38,9 @@ def load_reddit_data(filepath):
     with open(filepath, 'r') as f:
         rows = f.readlines()
     # remove newline chars, change true (invalid) to True (bool), false to False, null to None
-    # for r in rows:
-    #     r = r.rstrip()
-    #     r = r.replace('true', 'True')
-    #     r = r.replace('false', 'False')
-    #     r = r.replace('null', 'None')
-    switch = {'true': 'True', 'false': 'False', 'null': 'None'}
+    switch = {'true': 'True',
+            'false': 'False',
+            'null': 'None'}
     for item in switch:
         rows = [r.replace(item, switch[item]) for r in rows]
     rows = [r.rstrip() for r in rows]
@@ -52,8 +49,8 @@ def load_reddit_data(filepath):
     # then loaded into a pandas DataFrame
     df = pd.DataFrame(dictified)
     return df
-
-df = load_reddit_data(filepath)
+sample_reddit_data = 'data/RC_2008-11'
+df = load_reddit_data(sample_reddit_data)
 df.columns
 df[df.author == 'ironpony'].head(1)
 len(df.subreddit_id.unique())
@@ -132,7 +129,7 @@ class Reddit_Post_Date_Finder(object):
         #in case url is a single string
         if type(url_list) is str:
             url_list = [url_list]
-        if type(url_list) not list:
+        if type(url_list) is not list:
             print("This is a {} and needs to be a list:\n{}").format(type(url_list), url_list)
         # go through the url list, get the html from the url, and find the date
         dates = []
@@ -152,7 +149,7 @@ class Reddit_Post_Date_Finder(object):
 
 
 if __name__ == '__main__':
-    orig_json_file = 'coarse-discourse/coarse_discourse_dataset.json'
+    orig_json_file = 'data/coarse_discourse_dataset.json'
     df = load_discourse_data(orig_json_file)
     df.head()
     len(df)
