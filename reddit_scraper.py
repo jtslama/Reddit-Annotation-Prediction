@@ -3,8 +3,9 @@ from bs4 import BeautifulSoup
 import time
 import random
 import csv
+import praw
 from initial_data_loading import load_discourse_data
-from secrets/reddit_related import login_details
+from reddit_related import login_details
 
 
 class Reddit_Scraper(object):
@@ -17,33 +18,35 @@ class Reddit_Scraper(object):
         self.error_file = error_file
 
     def login(self, login_details, user_agent):
-        #initialize praw instance for retrieving data
+        # initialize praw instance for retrieving data
         self.reddit = praw.Reddit(client_id=login_details['CLIENT_ID'],
-                     client_secret=login_details['CLIENT_SECRET'],
-                     password=login_details['PASSWORD'],
-                     user_agent=user_agent,
-                     username=login_details['USERNAME'])
+                                  client_secret=login_details['CLIENT_SECRET'],
+                                  password=login_details['PASSWORD'],
+                                  user_agent=user_agent,
+                                  username=login_details['USERNAME'])
 
-    def _gen_submission(self, url):
+    def _get_submission(self, url):
         with open(self.error_file, 'a') as f:
             try:
                 req = self.reddit.submission(url=url)
+
             except:
                 writer = csv.writer(f)
-                writer.writerow("failed to return {url}".format(url))
+                writer.writerow(["failed to return {url}".format(url)])
         return req
 
-        if
     def get_dates(self, url_list, time_delay=1.5, rand_time=False):
         """
         INPUTS:
         url_list (list of strings) - urls to scrape
-        time_delay (int) - how long to wait in between urls (in seconds). Defaults to 1.5 seconds. Reddit API is max 60 reqs/min.
+        time_delay (int) - how long to wait in between urls (in seconds).
+                           Defaults to 1.5 seconds. Reddit API is max 60
+                           reqs/min.
         rand_time - whether or not to randomize the time in between requests
         OUTPUTS:
         dates (list) - dates, in the order of url_list
         """
-        #make sure the input is of the correct type
+        # make sure the input is of the correct type
         if type(url_list) is str:
             url_list = [url_list]
         if type(url_list) is not list:
@@ -54,12 +57,13 @@ class Reddit_Scraper(object):
         with open(self.date_file, 'a') as f:
             writer = csv.writer(f)
             for i, url in enumerate(url_list):
-                post = _gen_submission(url)
+                print("{}/{} : {}".format(i+1, len(url_list), url))
+                post = self._get_submission(url)
                 post_date = post.created_utc
                 dates.append(post_date)
-                writer.writerow(url, post_date)
+                writer.writerow([post_date, url])
                 if rand_time:
-                    time.sleep(time_delay+random.randint(0,5))
+                    time.sleep(time_delay + random.randint(0, 5))
                 else:
                     time.sleep(time_delay)
 
@@ -100,7 +104,7 @@ class Reddit_Scraper(object):
         INPUTS:
         html_str (string) - html from a page
         OUTPUTS:
-        date -
+        date (string) - post date
         """
         #TODO finish documentation when you figure out date type
         soup = BeautifulSoup(html_str, 'html.parser')
@@ -114,7 +118,8 @@ class Reddit_Scraper(object):
         the dates in the order of the urls.
         INPUTS:
         url_list (list of strings) - urls to scrape
-        time_delay (int) - how long to wait in between urls (in seconds). Defaults to 5 seconds.
+        time_delay (int) - how long to wait in between urls (in seconds).
+                           Defaults to 5 seconds.
         OUTPUTS:
         dates (list) - dates, in the order of url_list
         """
@@ -128,13 +133,13 @@ class Reddit_Scraper(object):
         dates = []
         for i, url in enumerate(url_list):
             html_text = _query_site(url)
-            print("{}/{}/n").format(i, len(url_list))
+            print("{}/{}").format(i, len(url_list))
             date = _parse_html(html_text)
             #TODO need to further refine date (Either here or in above fn)
             dates.append(date)
             #be sure to wait before repeating to avoid getting banned
             if rand_time:
-                time.sleep(time_delay+random.randint(0,10))
+                time.sleep(time_delay+random.randint(0, 10))
             else:
                 time.sleep(time_delay)
 
@@ -160,9 +165,16 @@ types: t1_=comment, t2_=account, t3_=link, t4_=message, t5_=subreddit, t6=_award
 if __name__ == '__main__':
     # get the list to test on
     coarse_json = 'data/coarse_discourse_dataset.json'
+    print("Loading {}...".format(coarse_json))
     coarse_df = load_discourse_data(coarse_json)
-    test_urls = list(coarse_df.url[:10])
+    urls = list(coarse_df.url)
+    len(urls)
+    print("{} loaded".format(coarse_json))
     # try to scrape them
-    Date_Finder = Reddit_Scraper(date_file='data/list_of_dates.csv', error_file='data/error_log.csv')
-    Date_Finder.login(user_agent='testing date_finder by ArSlatehorn')
-    dates = Date_Finder.get_dates(url_list)
+    Date_Finder = Reddit_Scraper(date_file='data/list_of_dates.csv',
+                                 error_file='data/error_log.csv')
+    print("logging in...")
+    Date_Finder.login(login_details,
+                      user_agent='testing date_finder by ArSlatehorn')
+    print("searching for dates...")
+    dates = Date_Finder.get_dates(urls)

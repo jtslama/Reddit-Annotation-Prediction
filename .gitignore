@@ -6,7 +6,7 @@
 tmp-*
 tmp/
 data/
-secrets/
+*config.py
 
 
 ## latex
