@@ -4,6 +4,7 @@ import ast
 import requests
 from bs4 import BeautifulSoup
 import time
+import random
 
 
 def load_discourse_data(filepath):
@@ -49,115 +50,58 @@ def load_reddit_data(filepath):
     # then loaded into a pandas DataFrame
     df = pd.DataFrame(dictified)
     return df
-sample_reddit_data = 'data/RC_2008-11'
-df = load_reddit_data(sample_reddit_data)
-df.columns
-df[df.author == 'ironpony'].head(1)
-len(df.subreddit_id.unique())
 
 
-
-%cd /Users/jt/Desktop/Galvanize/DSI_Capstone/
-filepath = 'data/RC_2008-11'
-df = load_discourse_data(filepath)
-with open(filepath, 'r') as f:
-    rows = f.readlines()
-type(rows[0])
-rows[0]
+def construct_urls(df):
+    starter_url = 'www.reddit.com/r/'
+    urls = []
+    for num in df['link_id']:
+        # num consists of id_type (eg t2) + _ + id, we only want id
+        url = starter_url + num[3:]
+        urls.append(url)
+    return urls
 
 """
-Note:
-A potential snag: the coarse-discourse dataset doesn't take date into account.
-There is  no date information in any column, and it is not ordered according to date.
+def _find_link_ids(df):
+    url = 'https://www.reddit.com/r/100movies365days/comments/1bx6qw/dtx120_87_nashville/'
 
-If I want to download only a small subset of the reddit data (for instance,
-1 month), I will need to scrape reddit (or use its API), using the url in my
-dataframe to find the date.
+    for url in df['url']
+    url_components = url.split('/')
+    link_id = 't3_'+ url_components[ url_components.index('comments')+1]
 """
 
-class Reddit_Post_Date_Finder(object):
+
+
+
+def _simplify(df, cols=None):
     """
-    To solve a problem I didn't know I had
-    TODO: datetime handling, what goes in init?
+    To reduce to number of columns to those I need to look at more closely (for EDA)
     """
-    def __init__(self):
-        pass
-
-    def _query_site(self, url):
-        """
-        Retrieves the html content from a single url
-        Exits if it receives an invalid code, with the code received
-        INPUTS:
-        url (string) - url to visit
-        OUTPUTS:
-        res.text (string) - the html content from the url
-        """
-        res = requests.get(url)
-        if not res.status_code == requests.codes.ok:
-            print("WARNING: status code", res.status_code)
-            print('\n')
-        else:
-            print("Loading html from: ")
-            print(url)
-            return res.text
-
-    def _parse_html(self, html_str):
-        """
-        Parses html to find the date of the post
-        INPUTS:
-        html_str (string) - html from a page
-        OUTPUTS:
-        date -
-        """
-        #TODO finish documentation when you figure out date type
-        soup = BeautifulSoup(html_str, 'html.parser')
-        date = soup.select("p[class='tagline'] > time")
-        #TODO: need to further refine date to just day
-        return date
-
-    def get_dates(self, url_list, time_delay=5):
-        """
-        Runs _query_site and _parse_html for every url in url_list, returning
-        the dates in the order of the urls.
-        INPUTS:
-        url_list (list of strings) - urls to scrape
-        time_delay (int) - how long to wait in between urls (in seconds). Defaults to 5 seconds.
-        OUTPUTS:
-        dates (list) - dates, in the order of url_list
-        """
-        #TODO need to make sure the wait time is correct before using
-        #in case url is a single string
-        if type(url_list) is str:
-            url_list = [url_list]
-        if type(url_list) is not list:
-            print("This is a {} and needs to be a list:\n{}").format(type(url_list), url_list)
-        # go through the url list, get the html from the url, and find the date
-        dates = []
-        for i, url in enumerate(url_list):
-            html_text = _query_site(url)
-            print("{}/{}/n").format(i, len(url_list))
-            date = _parse_html(html_text)
-            #TODO need to further refine date (Either here or in above fn)
-            dates.append(date)
-            #be sure to wait before repeating to avoid getting banned
-            time.sleep(time_delay)
-
-        return dates
-
+    if not cols:
+        cols = ['author_flair_css_class', 'author_flair_text', 'controversiality', 'distinguished', 'downs', 'edited', 'gilded', 'score', 'score_hidden', 'ups']
+    return df.drop(cols, axis=1)
 
 
 
 
 if __name__ == '__main__':
     orig_json_file = 'data/coarse_discourse_dataset.json'
-    df = load_discourse_data(orig_json_file)
-    df.head()
-    len(df)
+    coarse_df = load_discourse_data(orig_json_file)
+    coarse_df.head()
+    list(coarse_df.url[:10])
+    len(coarse_df)
 
     # looking at a small sample of reddit data
-
-
-    # small test case (to test scraper)
-    urls = df.url.tolist()[:10]
-    Finder = Reddit_Post_Date_Finder()
-    dates = Finder.get_dates(urls, time_delay=10)
+    sample_reddit_data = 'data/RC_2008-11'
+    comment_df = load_reddit_data(sample_reddit_data)
+    comment_df.columns
+    comment_df.head()
+    comment_df.distinguished.unique()
+    # there's a ton. Let's get rid of some columns I don't need
+    less_reddit = _simplify(comment_df)
+    less_reddit.head()
+    less_reddit.columns
+    less_reddit.ix[1]
+    len(less_reddit.id.unique())
+    less_reddit.link_id[1]
+    less_reddit.retrieved_on.max()
