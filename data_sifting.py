@@ -41,4 +41,5 @@ def load_date_url_table(filepath):
 
 """
 Process:
-I need to find the date ranges for which I need to download reddit data. 
+I need to find the date ranges for which I need to download reddit data.
+"""

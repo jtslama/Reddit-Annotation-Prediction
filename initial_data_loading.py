@@ -1,8 +1,7 @@
 import pandas as pd
 import json
 import ast
-import requests
-from bs4 import BeautifulSoup
+import datetime
 import time
 import random
 
@@ -50,27 +49,6 @@ def load_reddit_data(filepath):
     return df
 
 
-def construct_urls(df):
-    starter_url = 'www.reddit.com/r/'
-    urls = []
-    for num in df['link_id']:
-        # num consists of id_type (eg t2) + _ + id, we only want id
-        url = starter_url + num[3:]
-        urls.append(url)
-    return urls
-
-"""
-def _find_link_ids(df):
-    url = 'https://www.reddit.com/r/100movies365days/comments/1bx6qw/dtx120_87_nashville/'
-
-    for url in df['url']
-    url_components = url.split('/')
-    link_id = 't3_'+ url_components[ url_components.index('comments')+1]
-"""
-
-
-
-
 def _simplify(df, cols=None):
     """
     To reduce to number of columns to those I need to look at more closely (for EDA)
@@ -80,12 +58,38 @@ def _simplify(df, cols=None):
     return df.drop(cols, axis=1)
 
 
+def _normalize_the_time_flow(filename):
+    %cd Galvanize/DSI_Capstone/data
+    %ls
+    filename = 'list_of_dates.csv'
+    df = pd.read_csv(filename, header=None, names=['epoch_date', 'url'])
+    df.columns
+    df.head()
+    df['date'] = pd.to_datetime(df['epoch_date'], unit='s')
+    m = {}
+    for yr in xrange(2007,2016):
+        for mnth in xrange(1,13):
+            s = df[(df['date'].dt.month==mnth) & (df['date'].dt.year==yr)]
+            m["{}-{}".format(yr,mnth)] = s
+    for k in m:
+        print len(m[k])
+    df.head()
+    type(df.date[0])
 
 
 if __name__ == '__main__':
+    #for testing
+    %pwd
+    %cd Desktop/
+    df = pd.read_csv('testing_cv_thing.csv')
+    df
+
+
+    """
     orig_json_file = 'data/coarse_discourse_dataset.json'
     coarse_df = load_discourse_data(orig_json_file)
     coarse_df.head()
+    coarse_df.url[1982]
     list(coarse_df.url[:10])
     len(coarse_df)
 
@@ -103,3 +107,4 @@ if __name__ == '__main__':
     len(less_reddit.id.unique())
     less_reddit.link_id[1]
     less_reddit.retrieved_on.max()
+    """
