@@ -16,15 +16,19 @@ class Reddit_Scraper(object):
     date_file (string) - filename of csv where dates and urls where be written
                          to (as date url pairs)
     """
-    def __init__(self, login_details, date_file='list_of_dates', error_file='error_log'):
+    def __init__(self, login_details, date_file='list_of_dates',
+                 error_file='error_log', user_agent='date_finder script'):
         #TODO: figure out how to setup the login stuff
         """
         Sets up default files for results and errors, creates praw instance for
         scraping and feeds it user information to log in.
         INPUTS:
-        login_details (dict) - a dictionary containing the client key-value pairs
+        login_details (dict) - a dictionary containing the client key-value
+                               pairs
         date_file (string) - filename where dates will be written (optional)
         error_file (string) - filename where errors will be written (optional)
+        user_agent (string) - descriptor of scraper to be supplied to Reddit
+                              (optional)
         OUTPUTS:
         none
         """
@@ -38,22 +42,7 @@ class Reddit_Scraper(object):
                                   user_agent=user_agent,
                                   username=login_details['USERNAME'])
 
-    def _get_submission(self, url):
-        #TODO: figure out try-except block standard practice
-        """
-        Attempts to retrieve a submission object from a url, logs an error
-        if it cannot.
-        """
-        with open(self.error_file, 'a') as f:
-            try:
-                req = self.reddit.submission(url=url)
-
-            except:
-                writer = csv.writer(f)
-                writer.writerow(["failed to return {url}".format(url)])
-        return req
-
-    def _get_date(self, submission, url):
+    def _get_date(self, url):
         #TODO: figure out try except block standard practice
         """
         Attempts to get the date created attribute (created_utc, in epoch
@@ -61,18 +50,15 @@ class Reddit_Scraper(object):
         """
         with open(self.error_file, 'a') as f:
             try:
+                submission = self.reddit.submission(url=url)
                 date = submission.created_utc
                 return date
-            except HTTPError:
-                error =  submission.response.status_code
+            except Exception as error:
                 print("Error: {}".format(error))
                 writer = csv.writer(f)
-                writer.writerow(["failed to return date from {url} with error {}"
-                                .format(url, error)])
+                writer.writerow(["failed to return date from {} with error {}".format(url, error)])
                 return None
-            finally:
-                print("ran into an error on submission")
-                return None
+
 
 
 
@@ -92,8 +78,7 @@ class Reddit_Scraper(object):
         if type(url_list) is str:
             url_list = [url_list]
         if type(url_list) is not list:
-            print("This is a {} and needs to be a list:\n{}")
-                 .format(type(url_list), url_list)
+            print("This is a {} and needs to be a list:\n{}").format(type(url_list), url_list)
 
         # go through the url list, get the html from the url, and find the date
         # write the date to the date_list, and append it to dates to be returned
@@ -102,12 +87,18 @@ class Reddit_Scraper(object):
             writer = csv.writer(f)
             for i, url in enumerate(url_list):
                 print("{}/{} : {}".format(i+1, len(url_list), url))
-                post = self._get_submission(url)
-                post_date = self._get_date(post, url)
+                # post = self._get_submission(url)
+                # print(post, type(post))    #DEBUG
+                #
+                # #DEBUG
+                # return post
+
+                post_date = self._get_date(url)
                 dates.append(post_date)
                 writer.writerow([post_date, url])
+                print("posted at {} (epoch seconds)".format(post_date))
                 if rand_time:
-                    time.sleep(max(1, 0.5+random.gauss(1, 1))
+                    time.sleep(max(1, 0.5+random.gauss(1, 1)))
                 else:
                     time.sleep(time_delay)
         return dates
@@ -180,7 +171,6 @@ class Reddit_Scraper(object):
 
 
 if __name__ == '__main__':
-
     # get the list to test on
     coarse_json = 'data/coarse_discourse_dataset.json'
     print("Loading {}...".format(coarse_json))
@@ -189,11 +179,11 @@ if __name__ == '__main__':
     # scraper broke on url #1983
     urls = urls[1982:]
     print("{} loaded".format(coarse_json))
-    # try to scrape them
-    Date_Finder = Reddit_Scraper(date_file='data/list_of_dates.csv',
-                                 error_file='data/error_log.csv')
+    # try to scrape items on the list
     print("logging in...")
-    Date_Finder.login(login_details,
-                      user_agent='testing date_finder by ArSlatehorn')
+    Date_Finder = Reddit_Scraper(login_details,
+                                 date_file='data/list_of_dates.csv',
+                                 error_file='data/error_log.csv',
+                                 user_agent='testing date_finder by ArSlatehorn')
     print("searching for dates...")
     dates = Date_Finder.get_dates(urls)

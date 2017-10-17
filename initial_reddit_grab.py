@@ -61,7 +61,9 @@ def makeup_url_list(filename):
 
 
 if __name__ == '__main__':
+    # ~150GB to download
     # make full url list, write file
+    """NOTE: Terminated at RC_2013-10 (<-needs to be downloaded)"""
     urls = makeup_url_list()
     # use a subsection for test purposes
     test_url = urls[0]
