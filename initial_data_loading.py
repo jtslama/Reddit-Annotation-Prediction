@@ -26,8 +26,6 @@ def load_discourse_data(filepath):
     return df
 
 
-
-
 def load_reddit_data(filepath):
     """
     Since I keep doing it, and its a pain every time:
