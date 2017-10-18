@@ -23,7 +23,7 @@ def write_url_list(filename, base_url=None):
     # creates a url string for each month of each year in xrange (or months
     # 10-12 in 2007)
     urls = []
-    for n in xrange(2007, 2016):
+    for n in xrange(2007, 2017):
         if n == 2007:
             for i in xrange(10, 13):
                 url_path = "{}/{}/RC_{}-{}.bz2".format(base_url, n, n, i)
@@ -48,10 +48,10 @@ def makeup_url_list(filename):
     INPUT: filename - string of filename to write to
     OUTPUT: creates or modifies filename with list of urls
     """
-
+    alt_url = 'http://files.pushshift.io/reddit/comments/'
     base_url = 'https://archive.org/download/2015_reddit_comments_corpus/reddit_data'
     urls = []
-    for n in xrange(2008, 2016):
+    for n in xrange(2008, 2017):
         for i in xrange(1, 10):
             url_path = "{}/{}/RC_{}-0{}.bz2".format(base_url, n, n, i)
             urls.append(url_path)
@@ -63,7 +63,8 @@ def makeup_url_list(filename):
 if __name__ == '__main__':
     # ~150GB to download
     # make full url list, write file
-    """NOTE: Terminated at RC_2013-10 (<-needs to be downloaded)"""
+    start_urls = write_url_list('reddit_zip_urls.txt')
+    # stalled, missed some
     urls = makeup_url_list()
     # use a subsection for test purposes
     test_url = urls[0]

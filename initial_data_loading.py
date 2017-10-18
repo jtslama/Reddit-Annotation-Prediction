@@ -4,6 +4,7 @@ import ast
 import datetime
 import time
 import random
+import matplotlib.pyplot as plt
 
 
 def load_discourse_data(filepath):
@@ -31,7 +32,6 @@ def load_reddit_data(filepath):
     The steps necessary to take the file of a list of json objects and compile it
     into a pandas DataFrame
     """
-    filepath = 'data/RC_2008-11'
     # read file into a list
     with open(filepath, 'r') as f:
         rows = f.readlines()
@@ -59,51 +59,80 @@ def _simplify(df, cols=None):
 
 
 def _normalize_the_time_flow(filename):
-    %cd Galvanize/DSI_Capstone/data
-    %ls
-    filename = 'list_of_dates.csv'
     df = pd.read_csv(filename, header=None, names=['epoch_date', 'url'])
-    df.columns
-    df.head()
     df['date'] = pd.to_datetime(df['epoch_date'], unit='s')
-    m = {}
+    return df
+
+
+def _show_usefulness(df,useless=True):
+    m, u = {}, {}
     for yr in xrange(2007,2016):
         for mnth in xrange(1,13):
-            s = df[(df['date'].dt.month==mnth) & (df['date'].dt.year==yr)]
-            m["{}-{}".format(yr,mnth)] = s
-    for k in m:
-        print len(m[k])
-    df.head()
-    type(df.date[0])
+            s = len( df[(df['date'].dt.month==mnth) & (df['date'].dt.year==yr)] )
+            if s > 0:
+                m["{}-{}".format(yr,mnth)] = s
+            if u.get(s):
+                u[s].append( "{}-{}".format(yr,mnth) )
+            else:
+                u[s] = ["{}-{}".format(yr,mnth)]
+
+    if useless:
+        return u.get(0, None)
+    return m.keys()
+
 
 
 if __name__ == '__main__':
     #for testing
-    %pwd
-    %cd Desktop/
-    df = pd.read_csv('testing_cv_thing.csv')
-    df
+    scraped_dates = 'data/list_of_dates.csv'
+    df = _normalize_the_time_flow(scraped_dates)
+    df.url[0]
+    unnecessary = _show_usefulness(df)
+    nec = _show_usefulness(df, useless=False)
 
 
-    """
+    #for visualization
     orig_json_file = 'data/coarse_discourse_dataset.json'
     coarse_df = load_discourse_data(orig_json_file)
-    coarse_df.head()
+
+    for subreddit in coarse_df.subreddit.unique():
+        print subreddit
+    coarse_df[coarse_df.subreddit == 'circlejerk']['posts'].iloc[0]
+    len(coarse_df)
     coarse_df.url[1982]
     list(coarse_df.url[:10])
     len(coarse_df)
 
     # looking at a small sample of reddit data
-    sample_reddit_data = 'data/RC_2008-11'
+    %pwd
+    sample_reddit_data = 'data/RC_2008-06'
     comment_df = load_reddit_data(sample_reddit_data)
-    comment_df.columns
+    comment_df[comment_df.link_id == 't3_7ajhj']
     comment_df.head()
     comment_df.distinguished.unique()
+
+    later_reddit_data = 'data/RC_2008-11'
+    later_df = load_reddit_data(sample_reddit_data)
+
     # there's a ton. Let's get rid of some columns I don't need
-    less_reddit = _simplify(comment_df)
+    early = _simplify(comment_df)
+    later = _simplify(later_df)
+    a = early[early['link_id']=='t3_6liww']
+    b = later[later['link_id']=='t3_6liww']
+    edits = []
+    for l_id in early.link_id:
+        a = len( early[early['link_id']==l_id] )
+        b = len( later[later['link_id']==l_id] )
+        if b != a:
+            print "{} grew by {}".format(l_id, b-a)
+            edits.append([l_id, (a,b)])
+
+
+
+    len(a), len(b)
     less_reddit.head()
+    less_reddit[less_reddit['link_id'] == 't3_7ajhj']
     less_reddit.columns
-    less_reddit.ix[1]
     len(less_reddit.id.unique())
     less_reddit.link_id[1]
     less_reddit.retrieved_on.max()
