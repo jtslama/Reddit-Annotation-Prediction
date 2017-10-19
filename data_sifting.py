@@ -1,5 +1,5 @@
 import pandas as pd
-from initial_data_loading import load_discourse_data
+from initial_data_loading import load_discourse_data, load_reddit_data, 
 
 
 def load_reddit_data(filepath):

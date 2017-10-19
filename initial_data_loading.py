@@ -1,36 +1,42 @@
 import pandas as pd
+import numpy as np
 import json
 import ast
 import datetime
 import time
 import random
-import matplotlib.pyplot as plt
+import re
+from collections import defaultdict
 
 
-def load_discourse_data(filepath):
+# def load_data_from_jsons(filepath):
+#     """
+#     Since I keep doing it, and its a pain every time:
+#     The steps necessary to take the file of a list of json objects and compile it
+#     into a pandas DataFrame
+#     """
+#     # read file into a list
+#     with open(filepath, 'r') as f:
+#         lines = f.readlines()
+#     # remove newline chars, change true (invalid) to True (bool)
+#     rows = [lin.rstrip().replace('true', 'True') for lin in lines]
+#     rows_fixed = [r.replace('true', 'True') for r in rows]
+#     # now each string can be made to a dictionary
+#     dictified = [ast.literal_eval(rf) for rf in rows_fixed]
+#     # then loaded into a pandas DataFrame
+#     df = pd.DataFrame(dictified)
+#     return df
+
+
+def load_data_from_jsons(filepath):
     """
-    Since I keep doing it, and its a pain every time:
     The steps necessary to take the file of a list of json objects and compile it
     into a pandas DataFrame
-    """
-    # read file into a list
-    with open(filepath, 'r') as f:
-        lines = f.readlines()
-    # remove newline chars, change true (invalid) to True (bool)
-    rows = [lin.rstrip().replace('true', 'True') for lin in lines]
-    rows_fixed = [r.replace('true', 'True') for r in rows]
-    # now each string can be made to a dictionary
-    dictified = [ast.literal_eval(rf) for rf in rows_fixed]
-    # then loaded into a pandas DataFrame
-    df = pd.DataFrame(dictified)
-    return df
-
-
-def load_reddit_data(filepath):
-    """
-    Since I keep doing it, and its a pain every time:
-    The steps necessary to take the file of a list of json objects and compile it
-    into a pandas DataFrame
+    INPUTS:
+    filepath (string) - file path or name of file (made up of list of json
+                        objects)
+    OUTPUTS:
+    df (pandas dataframe) - dataframe of the objects in filepath
     """
     # read file into a list
     with open(filepath, 'r') as f:
@@ -49,7 +55,7 @@ def load_reddit_data(filepath):
     return df
 
 
-def _simplify(df, cols=None):
+def simplify(df, cols=None):
     """
     To reduce to number of columns to those I need to look at more closely (for EDA)
     """
@@ -58,13 +64,42 @@ def _simplify(df, cols=None):
     return df.drop(cols, axis=1)
 
 
-def _normalize_the_time_flow(filename):
-    df = pd.read_csv(filename, header=None, names=['epoch_date', 'url'])
+def prep_dates(infile, outfile='dates_prepped.csv', out=True):
+    """
+    Create a file which will be used to search the comment data set files
+    (which are broken up into months, and named RC_yyyy-mm)
+    INPUTS:
+    infile - csv file which contains dates in epoch seconds and urls
+             (in that order)
+    out - boolean value, determines whether to write a csv of the results or not
+    outfile - name of the csv file to write the data to, if out is set to True
+    OUTPUTS:
+    df - full dataframe, with columns of formatted date
+    outfile - if out is set to True, returns csv with the columns file_name
+             (date formatted to RC_yyyy-mm) and link_id (thread identifier
+             fullname)
+    """
+    # read file into database
+    df = pd.read_csv(infile, header=None, names=['epoch_date', 'url'])
+    # remove nulls
+    df.dropna(axis=0, inplace=True)
+    # append column with datetimes
     df['date'] = pd.to_datetime(df['epoch_date'], unit='s')
-    return df
+    # make column for data-selection
+    yr = df['date'].dt.year.apply(lambda x: str(int(x)))
+    mo = df['date'].dt.month.apply(lambda x: str(int(x)).zfill(2))
+    df['yr-month'] = 'RC_' + yr + '-' + mo
+    # make column for link_ids
+    df['link_id'] = df['url'].apply(lambda x: "t3_"+re.findall("comments/(.*?)/", x)[0])
+    if out:
+        out_df = df[['yr-month', 'link_id']].groupby('yr-month')
+        df.to_csv(outfile, columns=['yr-month', 'link_id'], index=False)
+    else:
+        return df
 
 
-def _show_usefulness(df,useless=True):
+
+def show_usefulness(df,useless=True):
     m, u = {}, {}
     for yr in xrange(2007,2016):
         for mnth in xrange(1,13):
@@ -81,59 +116,89 @@ def _show_usefulness(df,useless=True):
     return m.keys()
 
 
+def small_test_prep(ann_df, scraped_df, out=False):
+    # remove nulls in scraped
+    scraped_df.dropna(axis=0, inplace=True)
+    # append columns
+    df = pd.merge(ann_df, scraped_df, how='outer', on='url')
+    df.drop(labels=['is_self_post'], axis=1, inplace=True)
+    return df
+
+
+def test(annotations, comments):
+    # create set of annotation ids
+    ann_ids = set()
+    A = defaultdict(list)
+    for thread in test_df['posts']:
+        for item in thread:
+            ann_ids.add(item['id'])
+            A[item['id']] = item['annotations']
+    # create set of comment names (same format as annotation ids)
+    comment_set = set(comments['name'])
+    #find intersection of sets
+    inter = ann_ids.intersection(comment_set)
+    # Identify parts we want to keep going forward:
+    # take body from comments for intersecting names
+    relevant_comments = comments[comments['name'].isin(inter)].set_index('name')
+    # take relevant annotations
+    D = {}
+    for i in inter:
+        if i in A:
+            D[i] = A.get(i)
+    # merge together
+    ann_df = pd.DataFrame.from_dict(D,orient='index')
+    ann_df.rename(columns={0:'ann_1', 1:'ann_2', 2:'ann_3'}, inplace=True)
+    final_df = relevant_comments.join(ann_df)
+
+    return final_df
+
+
 
 if __name__ == '__main__':
-    #for testing
+    # make normalized_list_of_dates
     scraped_dates = 'data/list_of_dates.csv'
-    df = _normalize_the_time_flow(scraped_dates)
-    df.url[0]
-    unnecessary = _show_usefulness(df)
-    nec = _show_usefulness(df, useless=False)
-
+    # make a file with which to search the table
+    df = prep_dates(scraped_dates, outfile='data/search_table.csv', out=False)
 
     #for visualization
     orig_json_file = 'data/coarse_discourse_dataset.json'
-    coarse_df = load_discourse_data(orig_json_file)
-
-    for subreddit in coarse_df.subreddit.unique():
-        print subreddit
-    coarse_df[coarse_df.subreddit == 'circlejerk']['posts'].iloc[0]
-    len(coarse_df)
-    coarse_df.url[1982]
-    list(coarse_df.url[:10])
-    len(coarse_df)
+    coarse_df = load_data_from_jsons(orig_json_file)
+    coarse_df.head()
+    coarse_test_df = load_data_from_jsons(orig_json_file)
+    coarse_test_df = coarse_df
 
     # looking at a small sample of reddit data
-    %pwd
     sample_reddit_data = 'data/RC_2008-06'
-    comment_df = load_reddit_data(sample_reddit_data)
-    comment_df[comment_df.link_id == 't3_7ajhj']
-    comment_df.head()
-    comment_df.distinguished.unique()
+    comment_df = load_data_from_jsons(sample_reddit_data)
 
     later_reddit_data = 'data/RC_2008-11'
-    later_df = load_reddit_data(sample_reddit_data)
+    later_df = load_data_from_jsons(later_reddit_data)
+    useless = show_usefulness(df)
+    simp_later = simplify(later_df)
+
+    #small test
+    # smush together scraped dates, link_ids with annotation data
+    test_df = small_test_prep(coarse_df, df)
+    # try to get comments
+    # check to see that there are comments from an annotation thread in 11/2008 in later_df
+    a = later_df[later_df['link_id'] == 't3_7bfl5']
+    # try to get their contents out
+    test_df.head()
+    later_df.head()
+
+    desired_I = test(test_df, later_df)
+    D
+
+    a = later_df[later_df['name'].isin(desired_I)]
+    a.head()
+    desired_I.head()
+    D
+
+    m=0
+    m
+
+
 
     # there's a ton. Let's get rid of some columns I don't need
-    early = _simplify(comment_df)
-    later = _simplify(later_df)
-    a = early[early['link_id']=='t3_6liww']
-    b = later[later['link_id']=='t3_6liww']
-    edits = []
-    for l_id in early.link_id:
-        a = len( early[early['link_id']==l_id] )
-        b = len( later[later['link_id']==l_id] )
-        if b != a:
-            print "{} grew by {}".format(l_id, b-a)
-            edits.append([l_id, (a,b)])
-
-
-
-    len(a), len(b)
-    less_reddit.head()
-    less_reddit[less_reddit['link_id'] == 't3_7ajhj']
-    less_reddit.columns
-    len(less_reddit.id.unique())
-    less_reddit.link_id[1]
-    less_reddit.retrieved_on.max()
-    """
+    early = simplify(comment_df)
+    later = simplify(later_df)
