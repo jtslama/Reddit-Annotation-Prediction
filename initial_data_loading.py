@@ -66,8 +66,8 @@ def simplify(df, cols=None):
 
 def prep_dates(infile, outfile='dates_prepped.csv', out=True):
     """
-    Create a file which will be used to search the comment data set files
-    (which are broken up into months, and named RC_yyyy-mm)
+    Create a file and or dataframe which will be used to search the comment data
+    set files (which are broken up into months, and named RC_yyyy-mm)
     INPUTS:
     infile - csv file which contains dates in epoch seconds and urls
              (in that order)
@@ -153,6 +153,11 @@ def test(annotations, comments):
     return final_df
 
 
+def test_annotations(ann):
+    r = []
+    for row in ann['posts']:
+        r.
+
 
 if __name__ == '__main__':
     # make normalized_list_of_dates
@@ -163,17 +168,13 @@ if __name__ == '__main__':
     #for visualization
     orig_json_file = 'data/coarse_discourse_dataset.json'
     coarse_df = load_data_from_jsons(orig_json_file)
-    coarse_df.head()
-    coarse_test_df = load_data_from_jsons(orig_json_file)
-    coarse_test_df = coarse_df
+    coarse_df[coarse_df.isnull().any(axis=1)]
 
-    # looking at a small sample of reddit data
-    sample_reddit_data = 'data/RC_2008-06'
-    comment_df = load_data_from_jsons(sample_reddit_data)
-
+    #load some data
     later_reddit_data = 'data/RC_2008-11'
     later_df = load_data_from_jsons(later_reddit_data)
     useless = show_usefulness(df)
+    useless
     simp_later = simplify(later_df)
 
     #small test
@@ -189,14 +190,59 @@ if __name__ == '__main__':
     desired_I = test(test_df, later_df)
     D
 
-    a = later_df[later_df['name'].isin(desired_I)]
-    a.head()
-    desired_I.head()
-    D
 
-    m=0
-    m
+    ann.head()
+    r = []
+    # ann['ann_key]'] = xrange(len(ann))
+    for i, post in enumerate(ann['posts']):
+        for comment in post:
+            comment['ann_key'] = i
+            r.append(comment)
+    d = pd.DataFrame(r)
+    d.head()
+    f.head()
+    g.head()
+    f = d.set_index('ann_key')
+    g= f.join(ann)
+    g.drop(['posts','yr-month', 'epoch_date', 'url'], axis=1, inplace=True)
+    g.drop('ann_key]', axis=1, inplace=True)
+    #fix resulting nulls
+    g.head(20)
+    g.columns
+    g.post_depth = g.post_depth.fillna(value=0)
+    g.in_reply_to = g.in_reply_to.fillna(value='none')
+    g.majority_link = g.majority_link.fillna(value='none')
+    g.majority_type = g.majority_type.fillna(value='none')
+    g.is_first_post = g.is_first_post.fillna(value=False)
+    g.reset_index(drop=True, inplace=True)
+    fills = {"in_reply_to": None, "is_first_post": False}
+    pd.isnull(g).sum()
 
+    for i, r in enumerate(ann['subreddit'].head(10)):
+        print i, r
+
+
+
+    ann.head()
+    ann.posts.head(10)
+    r = []
+    for row in ann['posts'].head(20):
+        for a in row:
+            d = pd.DataFrame(a)
+            r.append(d)
+
+    ann2 = pd.concat(r, axis=0)
+    ann2.head()
+    type(ann2)
+    ann3 = ann2.transpose()
+    ann3
+
+    """
+        for a,s,d,l in posts, subs, date, link_id:
+            d = pd.DataFrame(a).concat(ann[[s,d,l]], names=['subreddit', 'date', 'link_id'], axis=1)
+            r.append(d)
+
+    ""
 
 
     # there's a ton. Let's get rid of some columns I don't need
