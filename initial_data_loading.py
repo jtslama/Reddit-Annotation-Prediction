@@ -7,7 +7,7 @@ import time
 import random
 import re
 from collections import defaultdict
-
+import json
 
 # def load_data_from_jsons(filepath):
 #     """
@@ -153,18 +153,13 @@ def test(annotations, comments):
     return final_df
 
 
-def test_annotations(ann):
-    r = []
-    for row in ann['posts']:
-        r.
-
 
 if __name__ == '__main__':
     # make normalized_list_of_dates
     scraped_dates = 'data/list_of_dates.csv'
     # make a file with which to search the table
     df = prep_dates(scraped_dates, outfile='data/search_table.csv', out=False)
-
+    df['yr-month'].value_counts().head()
     #for visualization
     orig_json_file = 'data/coarse_discourse_dataset.json'
     coarse_df = load_data_from_jsons(orig_json_file)
@@ -172,6 +167,8 @@ if __name__ == '__main__':
 
     #load some data
     later_reddit_data = 'data/RC_2008-11'
+    j = json.loads(later_reddit_data)
+
     later_df = load_data_from_jsons(later_reddit_data)
     useless = show_usefulness(df)
     useless
@@ -190,8 +187,8 @@ if __name__ == '__main__':
     desired_I = test(test_df, later_df)
     D
 
-
-    ann.head()
+    len(test_df)
+    len(ann)
     r = []
     # ann['ann_key]'] = xrange(len(ann))
     for i, post in enumerate(ann['posts']):
@@ -199,9 +196,7 @@ if __name__ == '__main__':
             comment['ann_key'] = i
             r.append(comment)
     d = pd.DataFrame(r)
-    d.head()
-    f.head()
-    g.head()
+
     f = d.set_index('ann_key')
     g= f.join(ann)
     g.drop(['posts','yr-month', 'epoch_date', 'url'], axis=1, inplace=True)
@@ -217,6 +212,9 @@ if __name__ == '__main__':
     g.reset_index(drop=True, inplace=True)
     fills = {"in_reply_to": None, "is_first_post": False}
     pd.isnull(g).sum()
+    g[g.isnull().any(axis=1)]
+    len(g.dropna())
+
 
     for i, r in enumerate(ann['subreddit'].head(10)):
         print i, r

@@ -7,7 +7,7 @@ from collections import defaultdict
 import time
 
 
-def load_data_from_jsons(filepath):
+def old_load_data_from_jsons(filepath):
     """
     The steps necessary to take the file of a list of json objects and compile it
     into a pandas DataFrame
@@ -33,6 +33,10 @@ def load_data_from_jsons(filepath):
     df = pd.DataFrame(dictified)
     return df
 
+
+def create_csv(filename):
+    df = load_data_from_jsons(filename)
+    df.to_csv(filename+'_translated.csv')
 
 def prep_dates(infile):
     """
@@ -105,7 +109,7 @@ def search_prep(ann_df, scraped_df):
     df.drop(labels=['is_self_post'], axis=1, inplace=True)
     return df
 
-def find_annotated_comments(annotations, comments):
+def old_find_annotated_comments(annotations, comments):
     # create set of annotation ids
     ann_ids = set()
     A = defaultdict(list)
@@ -129,50 +133,74 @@ def find_annotated_comments(annotations, comments):
     ann_df = pd.DataFrame.from_dict(D,orient='index')
     ann_df.rename(columns={0:'ann_1', 1:'ann_2', 2:'ann_3'}, inplace=True)
     final_df = relevant_comments.join(ann_df)
-
     return final_df
 
 
+def find_annotated_comments(annotations, comments):
+    """finds the intersection of annotatoins and comments where both contain
+    features relating to individual comments. They match on annotations.id and
+    comments.name (both pandas dfs)
+    """
+    # create set of annotation ids
+    annotations.set_index('id', inplace=True)
+    comments.set_index('name', inplace=True)
+    results = annotations.join(comments)
+    return results
+
+
 def search_files(annotations, file_list):
+    #time used for debugging
     searched = {}
     results = []
     for f in file_list:
+        START1 = time.time()
         comment_df = load_data_from_jsons(f)
+        END1 = time.time()
+        print("{} loaded, took {}s".format(f, END1-START1))
         df = find_annotated_comments(annotations, comment_df)
+        df.to_csv('{}_searched.csv'.format(f))
         searched[f] = df
         results.append(df)
+        END2 = time.time()
+        print("{} searched, took {}min".format(f, (END2-END1)/60))
 
     final_results = pd.concat(results)
+    final_results.to_csv("files_searched.csv")
     return final_results
 
 
 if __name__ == '__main__':
+    """
     #use datetime for debugging purposes:
     START1 = time.time()
     #create and prep date dataframe (date, url, yr-month key, link_id, by link_id)
     date_file = "data/list_of_dates.csv"
     dates = prep_dates(date_file)
     T1 = time.time()
-    print("dates prepped, took {}".format(T1-START1))
+    print("dates prepped, took {}s".format(T1-START1))
 
     # load annotations dataframe (post, url, subreddit, et alia, by url)
     START2 = time.time()
     annotation_file = 'data/coarse_discourse_dataset.json'
     annotations = load_data_from_jsons(annotation_file)
     T2 = time.time()
-    print("base annotations loaded, took {}".format(T2-START2))
+    print("base annotations loaded, took {}s".format(T2-START2))
 
     # merge annotations with its posts section
     START3 = time.time()
     search_table = prep_annotations(annotations, dates)
-    T3 = time.time()
-    print("search table constructed, took {}".format(T3-START3))
 
+    T3 = time.time()
+    print("search table constructed, took {}s".format(T3-START3))
     """
+    #annotations.head()
     #small test
+
+    annotations = pd.read_csv('annotations_table.csv') # duplicated below
     START4 = time.time()
-    comment_file = 'data/RC_2008-11'
+    comment_file = 'data/raw/RC_2008-11'
     comment_df = load_data_from_jsons(comment_file)
+    comment_df.head()
     T4 = time.time()
     START5 = time.time()
     print("smaller reddit file loaded, took {}".format(T4-START4))
@@ -180,10 +208,15 @@ if __name__ == '__main__':
     T5 = time.time()
     print("1 file test complete, took {}".format(T5-START5))
 
-    #larger run
+
+    s = pd.read_csv('search_params.csv')
+    s.head()
+    #run for one large file
+    """
     START6 = time.time()
-    file_list = ["data/RC_2008-11", "data/RC_2008-08"]
+    file_list = ["zips/R_data/RC_2016-04", "zips/R_data/RC_2016-05"]
+    annotations = pd.read_csv('annotations_table.csv') # duplicated above
     test_files_results = search_files(annotations, file_list)
     T6 = time.time()
-    print("2 file test complete, took {}".format(T6-START6))
+    print("{} files complete, took {}".format(len(file_list), T6-START6))
     """
