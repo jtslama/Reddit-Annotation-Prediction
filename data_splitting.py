@@ -77,3 +77,4 @@ if __name__ == '__main__':
     # save smaller test set as test2, larger as test1
     test1.to_csv('test2.csv', header=True, encoding='utf-8')
     test2.to_csv('test1.csv', header=True, encoding='utf-8')
+    train.to_csv('train.csv', header=True, encoding='utf-8')
