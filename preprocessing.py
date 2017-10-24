@@ -55,20 +55,7 @@ class Processor(object):
         return narrowed
 
 
-class Bayes(object):
-    def __init__(self, model=GaussianNB):
-        self.model=model
-        pass
 
-    def cross_validate(self):
-
-
-    def run(self, X, y):
-
-        NB = self.model()
-        NB.fit(X,y)
-
-        
 
 
 
@@ -76,6 +63,7 @@ if __name__ == '__main__':
     train = pd.read_csv('data/train.csv')
 
     basics = isolate_basics(train)
+
 
     processor = Processor()
     content = processor.prepare_data(train)

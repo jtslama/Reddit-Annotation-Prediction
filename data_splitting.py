@@ -9,6 +9,8 @@ from sklearn.model_selection import train_test_split
 
 
 
+
+
 def base_label_splitting(df):
     df['annotations'] = df['annotations'].map(lambda x: ast.literal_eval(x))
     df['ann_len'] = df['annotations'].map(lambda x: len(x))
@@ -70,11 +72,13 @@ if __name__ == '__main__':
     new_df = clean(df, extras)
 
     # split into train and test sets
-    train, test1 = train_test_split(new_df, test_size=0.1)
-    train, test2 = train_test_split(train, test_size=.25)
+    train0, test1 = train_test_split(new_df, test_size=0.1)
+    train, test2 = train_test_split(train0, test_size=.25)
 
 
     # save smaller test set as test2, larger as test1
     test1.to_csv('test2.csv', header=True, encoding='utf-8')
     test2.to_csv('test1.csv', header=True, encoding='utf-8')
     train.to_csv('train.csv', header=True, encoding='utf-8')
+
+    #getting an idea of the data
