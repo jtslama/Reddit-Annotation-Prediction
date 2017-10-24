@@ -4,20 +4,9 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from nltk.stem.wordnet import WordNetLemmatizer
 from nltk.tokenize import RegexpTokenizer
 from nltk.stem import WordNetLemmatizer, SnowballStemmer, PorterStemmer
-from nltk.corpus import stopwords
+from sklearn.naive_bayes import GaussianNB, MultinomialNB
+from sklearn.model_selection import train_test_split,  cross_val_score
 import numpy as np
-
-
-
-
-def _tokenize(text):
-    #TODO check to find kind that handles spaces, formatting well
-    tokenizer = RegexpTokenizer("\s+", gaps=True)
-    tokens = tokenizer.tokenize(text)
-    return tokens
-
-
-
 
 
 
@@ -66,6 +55,21 @@ class Processor(object):
         return narrowed
 
 
+class Bayes(object):
+    def __init__(self, model=GaussianNB):
+        self.model=model
+        pass
+
+    def cross_validate(self):
+
+
+    def run(self, X, y):
+
+        NB = self.model()
+        NB.fit(X,y)
+
+        
+
 
 
 if __name__ == '__main__':
@@ -75,4 +79,16 @@ if __name__ == '__main__':
 
     processor = Processor()
     content = processor.prepare_data(train)
-    X, vocab = processor.vectorize(content.body)
+
+    X_train, X_test, y_train, y_test = train_test_split(content['body'], content['majority_type'], test_size=0.25)
+
+    X_train, vocab = processor.vectorize(X_train)
+
+
+    GNB = GaussianNB().fit(X_train, y_train)
+    MNB = MultinomialNB().fit(X_train, y_train)
+    GNB_scores = cross_val_score(GNB, X_train, y=y_train, cv=5, n_jobs=-1)
+    MNB_scores = cross_val_score(MNB, X_train, y=y_train, cv=5, n_jobs=-1)
+    GNB_scores, MNB_scores
+
+    y_train.unique()
