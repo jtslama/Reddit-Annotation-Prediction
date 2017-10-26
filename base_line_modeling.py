@@ -1,15 +1,34 @@
 import pandas as pd
 import numpy as np
 from sklearn.naive_bayes import GaussianNB, MultinomialNB
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier, AdaBoostClassifier
+from sklearn.linear_model import LogisticRegressionCV, LogisticRegression
 from sklearn.grid_search import GridSearchCV
 from sklearn.model_selection import train_test_split,  cross_val_score
 from preprocessing import Processor
 
+class Baseline(object):
+    def __init__(self, X_train, y_train, X_test, y_test):
+        self.X_train = X_train
+        self.X_test = X_test
+        self.y_train = y_train
+        self.y_test = y_test
 
-class WeightedGuess(object):
-    def __init__(self):
-        pass
+    def fit(self, X, y):
+        return None
+
+    def predict(self, X):
+        return None
+
+    def run(self):
+        self.fit(self.X_train, self.y_train)
+        y_pred = self.predict(X_test)
+        acc = self.score(y_pred, y_test)
+        print("Accuracy score of {}".format(acc))
+        return acc
+
+
+class WeightedGuess(Baseline):
 
     def fit(self, X, y):
         proportions = y.value_counts()/y.value_counts().sum()
@@ -24,7 +43,7 @@ class WeightedGuess(object):
         accuracy = np.sum(y_pred==y_true)*1.0/len(y_true)
         return accuracy
 
-class MajorityGuess(WeightedGuess):
+class MajorityGuess(Baseline):
 
     def fit(self, X, y):
         proportions = y.value_counts()/y.value_counts().sum()
@@ -35,28 +54,23 @@ class MajorityGuess(WeightedGuess):
         y_pred = np.full(shape=(X.shape[0],), fill_value=self.guess)
         return y_pred
 
-def baseline_modeling(X_train, y_train):
+def run_baseline_modeling(X_train, y_train, X_test, y_test):
     #basic guesses
     # establish baseline models
     print("Running baseline models...")
-    WG = WeightedGuess()
-    WG.fit(X_train, y_train)
-    WG_pred = WG.predict(X_train)
-    # WG_pred.shape
-    # y_train.shape
-    WG_acc = WG.score(WG_pred, y_train)
+    WG_acc = WeightedGuess(X_train, y_train, X_test, y_test).run()
+    MJ_acc = MajorityGuess(X_train, y_train, X_test, y_test).run()
 
-    MJ = MajorityGuess()
-    MJ.fit(X_train,y_train)
-    MJ_pred = MJ.predict(X_train)
-    MJ_acc = MJ.score(MJ_pred, y_train)
-    models = [WG, MJ]
+    # MJ = MajorityGuess().fit(X_train,y_train)
+    # MJ_pred = MJ.predict(X_train)
+    # MJ_acc = MJ.score(MJ_pred, y_train)
+    # models = [WG, MJ]
     baselines = [WG_acc, MJ_acc]
     print("Baseline scores: {}".format(baselines))
-    return models, baselines
+    return baselines
 
 
-def basic_nb_models(X_train, y_train):
+def run_basic_nb_models(X_train, y_train):
     #NB
     print("Running Naive Bayes models...")
     GNB = GaussianNB().fit(X_train, y_train)
@@ -68,44 +82,120 @@ def basic_nb_models(X_train, y_train):
     print("Bayes scores:\n{}".format(Bayes_scores))
     return models, Bayes_scores
 
+def run_alt_model_tests(X_train, y_train):
+    #look at some basic model results:
+    """
+    print("Running grid search on LogReg...")
+    lr = LogisticRegressionCV()
+    LRparams = {'solver': ['lbfgs', 'liblinear', 'newton-cg', 'sag']}
+    lr_gs = GridSearchCV(lr, LRparams, n_jobs=-1, verbose=2).fit(X_train, y_train)
+    lr_res = [lr_gs.best_score_, lr_gs.best_params_]
+    print("LogReg desired scores and params\n{}\n{}".format(lr_res[0], lr_res[1]))
+
+
+    print("Running grid search on RF...")
+    rf = RandomForestClassifier()
+    RFparams = {'n_estimators': [100,500,1000,2000,5000]}
+    rf_gs = GridSearchCV(rf, RFparams, n_jobs=-1, verbose=2).fit(X_train, y_train)
+    rf_res = [rf_gs.best_score_, rf_gs.best_params_]
+    print("RF desired scores and params\n{}\n{}".format(rf_res[0], rf_res[1]))
+
+    print("Running grid search on GBC...")
+    est = GradientBoostingClassifier()
+    GBparams = {'n_estimators': [10,100,500],
+                'learning_rate': [.1, .05, .02],
+                'max_depth': [2, 3, 5]}
+    gb_gs = GridSearchCV(est, GBparams, n_jobs=-1, verbose=2).fit(X_train, y_train)
+    gs_res = [gb_gs.best_score_, gb_gs.best_params_]
+    print("GBC desired scores and params\n{}\n{}".format(gs_res[0], gs_res[1]))
+    """
+
+    print("Running grid search on Adaboost...")
+    ada = AdaBoostClassifier()
+    ABparams = {'n_estimators': [10,100,500],
+                'learning_rate': [.1, .05, .02]}
+    ab_gs = GridSearchCV(ada, ABparams, n_jobs=-1, verbose=2).fit(X_train, y_train)
+    ab_res = [ab_gs.best_score_, ab_gs.best_params_]
+    print("ABC desired scores and params\n{}\n{}".format(ab_res[0], ab_res[1]))
+
+    # return [lr_gs, rf_gs]#, gb_gs, ab_gs]
+
+
+def run_alt_model_ideas(X_train, y_train, X_test, y_test):
+    #look at some basic model results:
+    """
+    print("Running LogReg...")
+    LR = LogisticRegression(n_jobs=-1, verbose=2).fit(X_train, y_train)
+    LR_acc = LR.score(X_test, y_test)
+    print("LogReg accuracy score: {}".format(LR_acc))
+    """
+
+    print("Running RandomForest...")
+    RF = RandomForestClassifier(n_estimators=1000, n_jobs=-1, verbose=2).fit(X_train, y_train)
+    RF_acc = RF.score(X_test, y_test)
+    print("Random Forest accuracy score: {}".format(RF_acc))
+
+    print("Running GradientBoost...")
+    GBC = GradientBoostingClassifier(n_jobs=1, verbose=2).fit(X_train, y_train)
+    GBC_acc = GBC.score(X_test, y_test)
+    GBparams = {'n_estimators': [10,100,500],
+                'learning_rate': [.1, .05, .02],
+                'max_depth': [2, 3, 5]}
+    print("GBC accuracy score: {}".format(GBC_acc))
+
+    print("Running Adaboost...")
+    ADA = AdaBoostClassifier(n_jobs=-1, verbose=2).fit(X_train, y_train)
+    ADA_acc = ADA.score(X_test, y_test)
+    print("Adaboost accuracy score: {}".format(ADA_acc))
+
+    models = [LR, RF, GBC]
+    return models
+
+
 
 if __name__ == '__main__':
         # prepare data for modeling
         print("Loading data...")
         train = pd.read_csv('data/train.csv')
+        subset = train[:10000]
 
         print("Preprocessing...")
         processor = Processor()
-        content = processor.prepare_data(train)
+        remove_all_but_text = None
+
+        #TODO: deal with in_reply_to, parent_id
+        #is_first_post is a mix of false, nan and annotation values
+        #subreddit --> convert somehow?
+        #title > metric for how often words appear in reply
+        remove_most = ['Unnamed: 0', 'annotations', 'archived', 'author', 'date', \
+                       'distinguished', 'edited', 'in_reply_to', 'is_first_post', \
+                       'link_id', 'link_id_ann', 'majority_link', 'name',  \
+                       'parent_id' 'replies', 'retrieved_on', 'saved', \
+                       'score_hidden', 'subreddit', 'title', 'user_reports', 'ann_1', 'ann_2', 'ann_3']
+        content = processor.prepare_data(subset)
 
         print("Splitting...")
-        X_train, X_test, y_train, y_test = train_test_split(content['body'], content['majority_type'], test_size=0.25)
-        X_train, vocab = processor.vectorize(X_train)
+        X_train_basic, X_test_basic, y_train, y_test = train_test_split(content['body'], content['majority_type'], test_size=0.25)
 
-        
-        # establish baseline models
-        models, baseline_scores = baseline_modeling(X_train, y_train)
+        X_train, vocab = processor.vectorize(X_train_basic)
+        X_test, t_vocab = processor.vectorize(X_test_basic)
+
+        # (X_train.shape, y_train.shape), (X_test.shape, y_test.shape)
 
         # look at basic NB model results
-        models, NB_base_scores = basic_nb_models(X_train, y_train)
+        # nb_models, NB_base_scores = run_basic_nb_models(X_train, y_train)
 
+        # establish baseline models
+        # baseline_models, baseline_scores = run_baseline_modeling(X_train, y_train)
 
-        #look at some basic model results:
-        print("Running grid search on GBC...")
-        est = GradientBoostingClassifier()
-        GBparams = {'learning_rate': [.1, .05, .02],
-                  'max_depth': [2, 3, 5],
-                  'min_samples_leaf': [2, 3, 5, 10]}
-        gb_gs = GridSearchCV(est, GBparams, n_jobs=-1).fit(X_train, y_train)
-        gs_res = [gb_gs.best_score_, gb_gs.best_params_]
-        print("GBC desired scores and params\n{}\n{}".format(gs_res[0], gs_res[1]))
-        print("Running grid search on RF,,,")
-        rf = RandomForestClassifier()
-        RFparams = {'n_estimators': np.linspace(50,1000)}
-        rf_gs = GridSearchCV(rf, RFparams, n_jobs=-1).fit(X_train, y_train)
-        rf_res = [rf_gs.best_score_, rf_gs.best_params_]
-        print("RFdesired scores and params\n{}\n{}".format(rf_res[0], rf_res[1]))
+        # alternative model ideas
+        # alt_models = run_alt_model_ideas(X_train, y_train, X_test, y_test)
+        alt_models = run_alt_model_tests(X_train, y_train)
 
+        # RF = RandomForestClassifier(n_estimators=100, n_jobs=-1).fit(X_train, y_train)
+        # a = RF.score(X_test, y_test)
+
+        #
         #sklearn.metrics.r2score
 
 
