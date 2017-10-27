@@ -7,6 +7,7 @@ from sklearn.grid_search import GridSearchCV
 from sklearn.model_selection import train_test_split,  cross_val_score
 from preprocessing import Processor
 
+
 class Baseline(object):
     def __init__(self, X_train, y_train, X_test, y_test):
         self.X_train = X_train
@@ -70,13 +71,13 @@ def run_baseline_modeling(X_train, y_train, X_test, y_test):
     return baselines
 
 
-def run_basic_nb_models(X_train, y_train):
+def run_basic_nb_models(X_train, y_train, X_test, y_test):
     #NB
     print("Running Naive Bayes models...")
     GNB = GaussianNB().fit(X_train, y_train)
     MNB = MultinomialNB().fit(X_train, y_train)
-    GNB_scores = cross_val_score(GNB, X_train, y=y_train, cv=5, n_jobs=-1)
-    MNB_scores = cross_val_score(MNB, X_train, y=y_train, cv=5, n_jobs=-1)
+    GNB_scores = cross_val_score(GNB, X_test, y=y_test, cv=5, n_jobs=-1)
+    MNB_scores = cross_val_score(MNB, X_test, y=y_test, cv=5, n_jobs=-1)
     Bayes_scores = [GNB_scores, MNB_scores]
     models = [GNB, MNB]
     print("Bayes scores:\n{}".format(Bayes_scores))
@@ -121,22 +122,21 @@ def run_alt_model_tests(X_train, y_train):
     # return [lr_gs, rf_gs]#, gb_gs, ab_gs]
 
 
-def run_alt_model_ideas(X_train, y_train, X_test, y_test):
+def run_alt_models(X_train, y_train, X_test, y_test):
     #look at some basic model results:
-    """
     print("Running LogReg...")
-    LR = LogisticRegression(n_jobs=-1, verbose=2).fit(X_train, y_train)
+    LR = LogisticRegression(n_jobs=-1, verbose=2, solver='newton-cg').fit(X_train, y_train)
     LR_acc = LR.score(X_test, y_test)
     print("LogReg accuracy score: {}".format(LR_acc))
-    """
+
 
     print("Running RandomForest...")
-    RF = RandomForestClassifier(n_estimators=1000, n_jobs=-1, verbose=2).fit(X_train, y_train)
+    RF = RandomForestClassifier(n_estimators=10000, n_jobs=-1, verbose=1).fit(X_train, y_train)
     RF_acc = RF.score(X_test, y_test)
     print("Random Forest accuracy score: {}".format(RF_acc))
 
     print("Running GradientBoost...")
-    GBC = GradientBoostingClassifier(n_jobs=1, verbose=2).fit(X_train, y_train)
+    GBC = GradientBoostingClassifier(n_estimators=500, n_jobs=-1, learning_rate=.02, max_depth=3, verbose=1).fit(X_train, y_train)
     GBC_acc = GBC.score(X_test, y_test)
     GBparams = {'n_estimators': [10,100,500],
                 'learning_rate': [.1, .05, .02],
@@ -144,7 +144,7 @@ def run_alt_model_ideas(X_train, y_train, X_test, y_test):
     print("GBC accuracy score: {}".format(GBC_acc))
 
     print("Running Adaboost...")
-    ADA = AdaBoostClassifier(n_jobs=-1, verbose=2).fit(X_train, y_train)
+    ADA = AdaBoostClassifier(n_estimators=500, n_jobs=-1, learning_rate=0.1, verbose=1).fit(X_train, y_train)
     ADA_acc = ADA.score(X_test, y_test)
     print("Adaboost accuracy score: {}".format(ADA_acc))
 
@@ -157,10 +157,15 @@ if __name__ == '__main__':
         # prepare data for modeling
         print("Loading data...")
         train = pd.read_csv('data/train.csv')
-        subset = train[:10000]
+        df = train[:2000]
+        df.head()
+
+
+        print("Splitting...")
+        df_train, df_test = train_test_split(df, test_size=0.25)
 
         print("Preprocessing...")
-        processor = Processor()
+        P = Processor()
         remove_all_but_text = None
 
         #TODO: deal with in_reply_to, parent_id
@@ -170,21 +175,41 @@ if __name__ == '__main__':
         remove_most = ['Unnamed: 0', 'annotations', 'archived', 'author', 'date', \
                        'distinguished', 'edited', 'in_reply_to', 'is_first_post', \
                        'link_id', 'link_id_ann', 'majority_link', 'name',  \
-                       'parent_id' 'replies', 'retrieved_on', 'saved', \
+                       'parent_id', 'replies', 'retrieved_on', 'saved', \
                        'score_hidden', 'subreddit', 'title', 'user_reports', 'ann_1', 'ann_2', 'ann_3']
-        content = processor.prepare_data(subset)
 
-        print("Splitting...")
-        X_train_basic, X_test_basic, y_train, y_test = train_test_split(content['body'], content['majority_type'], test_size=0.25)
+        X_train, y_train = P.run(df_train, 'body', cols_to_drop=remove_most, sep=True)
+        X_test, y_test = P.run(df_test, 'body', cols_to_drop=remove_most, sep=True)
 
-        X_train, vocab = processor.vectorize(X_train_basic)
-        X_test, t_vocab = processor.vectorize(X_test_basic)
-
-        # (X_train.shape, y_train.shape), (X_test.shape, y_test.shape)
+        #NOTE for this one instance only. In future, .run will handle the separation
+        # y_train = df_train['majority_type'],
+        # X_train =  df_train.drop(['majority_type'], axis=1)
+        # y_test, X_test = df_test['majority_type'], df_test.drop(['majority_type'], axis=1)
 
         # look at basic NB model results
-        # nb_models, NB_base_scores = run_basic_nb_models(X_train, y_train)
+        nb_models, NB_base_scores = run_basic_nb_models(X_train, y_train, X_test, y_test)
+        #TODO throwing error: invalid data type (infin, Nan or too big)
 
+        for col in X_train.columns[:]:
+            # #checked Nan, only other data type is bool
+            # if type(X_train[col][0]) != numpy.float64:
+            #     print col, type(X_train[col][0])
+            # #checking too big...nope, highest is bool and 1.4e9
+            # if X_train[col].max() > 10**6:
+            #     print col, X_train[col].max()
+            #checking Nan...yup, got 956 Nans in every column
+            if sum(X_train[col].isnull())>0:
+                print col, sum(X_train[col].isnull())
+
+        X_train.head()
+
+
+        X_train.shape, y_train.shape
+        X_train.columns[:20]
+
+
+
+        X_test.shape, y_test.shape
         # establish baseline models
         # baseline_models, baseline_scores = run_baseline_modeling(X_train, y_train)
 
