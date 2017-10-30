@@ -20,95 +20,19 @@ class PreProcessor(object):
         self.SVD = None
         self.tfidf = None
 
-    def _tokenize(self, text, type=None):
-        #TODO check to find kind that handles spaces, formatting well
-        tokenizer = RegexpTokenizer(r"\s+|/", gaps=True)
-        tokens = tokenizer.tokenize(text)
-        return tokens
-
-        stemmer = WordNetLemmatizer()
-        stemmed = [stemmer.lemmatize(word) for word in tokens]
-        return stemmed
-
-    def _find_agreement(self, df):
-        #TODO finish function to fill in 'None's
-        needs_consensus = True if df['majority_type']=='None' else False
-        consensus = list(df['ann_1'], df['ann_2'], df['ann_3'])
-        pass
-
-    def vectorize(self, documents, max_features=None):
-        if not self.tfidf:
-            print("Creating initial TfidfVectorizer fit...")
-            self.tfidf = TfidfVectorizer(stop_words='english', \
-            tokenizer=self._tokenize, \
-            max_features=None).fit(documents)
-        vectors = self.tfidf.transform(documents).toarray()
-        words = self.tfidf.get_feature_names
-        return vectors, words
-
-    def _replace_nulls(self, df):
-        print('Replacing nulls in the following categories...')
-        if 'gilded' in df.columns:
-            print('gilded: changing strings to nums, all to True/False')
-            df['gilded'].replace(to_replace=['0','1','2'], value=[0,1,2], inplace=True)
-            df['gilded'] = df['gilded'] > 0
-        elif 'post_depth' in df.columns:
-            print('post_depth: changing nulls to 0\'s')
-            df['post_depth'] = df['post_depth'].fillna(value=0)
-            nulls = sum(df['post_depth'].isnull())
-            print( "nulls in post_depth:{}".format(nulls))
-        elif 'user_reports' in df.columns:
-            print('user_reports: replacing odd values, filling nulls with 0\'s')
-            df['user_reports'] = df['user_reports'].replace(to_replace='[]', value=1)
-            df['user_reports'] = df['user_reports'].fillna(value=0)
-        else:
-            print("...none selected")
-        return df
-
-    def prepare_data(self, df, remove=None):
-        # narrow down to desired categories
-        initial_size = df.shape
-        print('Removing specified categories...')
-        if remove:
-            new = df.drop(remove, axis=1)
-        else:
-            new = df[['body', 'majority_type', 'ann_1', 'ann_2', 'ann_3']]
-        #deal with nulls in desired columns
-        new = self._replace_nulls(new)
-        # drop remaining nulls
-        print("Dropping remaining nulls: ")
-        new = new.dropna(axis=0, how='any')
-        # handle some messy columns:
-        for col in ['ups', 'downs', 'created_utc']:
-            if col in new.columns:
-                new[col] = new[col].astype(int)
-        # drop or consolidate where annotators disagreed
-        if self._make_consensus:
-            new = self._find_agreement(new)
-        else:
-            new = new[~new['majority_type'].isnull()]
-        final_size = new.shape
-        print("Down to {} of {} initial features".format(final_size[1], initial_size[1]))
-        print("Removed {} rows".format(final_size[0]-initial_size[0]))
-        return new
-
-    def basic_feature_engineering(self, df):
-        # translate None labels into majority opinion if possible:
-        print("Redistributing 'None' labels...")
-        df = self.fix_None_labels(df)
-
-        return df
-
     def matrix_reduction(self, matrix, n_comp=2000, power_level=None):
         """
         INPUTS:
         matrix(numpy array) - the matrix to be reduced
-        n_comp (int) - dimension to initially reduce to, must be less than number of features (matrix.shape[1])
-        power_level(float) - the percentage of explained variance desired (b/t 0 and 1)
+        n_comp (int) - dimension to initially reduce to, must be less than
+                        number of features (matrix.shape[1])
+        power_level(float) - the percentage of explained variance desired
+                            (b/t 0 and 1) if extra reduction is desired
         OUTPUTS:
-        U_trunc - the trunkated user weight array (rows: items, columns: latent features, values: weights)
-        Sigma_trunc - the trunkated power array (rows: latent features, columns: power, values: power)
-        VT_trunc - the truncated features array (rows: item features, columns: latent features, values: weights)
+        U_trunc - the trunkated user weight array (rows: items, columns:
+                    latent features, values: weights)
+        Sigma_trunc - the trunkated power array (rows: latent features,
+                        columns: power, values: power)
         """
         initial_size = matrix.shape
         if power_level>1:
@@ -136,42 +60,69 @@ class PreProcessor(object):
 
         return U_trunc, Sigma_sq
 
-
-    def _none_fix_helper(self, row):
-        cts = row[['ann_1', 'ann_2', 'ann_3']].value_counts()
-        if row['majority_type'] == 'None' and cts.max() >1:
-            x = row[['ann_1', 'ann_2', 'ann_3']].value_counts().idxmax()
-        else:
-            x = row['majority_type']
-        return x
-
-    def fix_None_labels(self, df):
-
-        df['majority_type'] = df.apply(lambda row: self._none_fix_helper(row), axis=1)
-
+    def prepare_data(self, df, remove=None):
         """
-        subset.head()
-        for i in subset.index:
-            if subset.loc[i, 'majority_type'] == 'None':
-                subset.loc[i, 'majority_type'] = subset.loc[i, ['ann_1', 'ann_2', 'ann_3']].value_counts().idxmax()
-
-        subset.majority_type.value_counts()
+        A series of customized steps to clean the raw data. Includes removing
+        unwanted columns, removing, fixing or deleting data with nulls
+        (dependent on category).
+        INPUTS:
+        df (pandas dataframe) - the raw dataframe to be cleaned
+        remove(list of strings) - names of columns to be removed from
+                                the dataframe
+        OUTPUTS:
+        new (pandas dataframe) - cleaned dataframe
         """
-        return df
-
-
-    def _find_desired_power(self, Sq, power_level):
-        for i in xrange(len(Sq)):
-            if sum(Sq[:i]) >= power_level:
-                return i
+        # narrow down to desired categories
+        initial_size = df.shape
+        print('Removing specified categories...')
+        if remove:
+            new = df.drop(remove, axis=1)
         else:
-            return len(Sq)
+            new = df[['body', 'majority_type', 'ann_1', 'ann_2', 'ann_3']]
+        #deal with nulls in desired columns
+        new = self._replace_nulls(new)
+        # drop remaining nulls
+        print("Dropping remaining nulls: ")
+        new = new.dropna(axis=0, how='any')
+        # handle some messy columns:
+        for col in ['ups', 'downs', 'created_utc']:
+            if col in new.columns:
+                new[col] = new[col].astype(int)
+        # drop or consolidate where annotators disagreed
+        if self._make_consensus:
+            new = self._find_agreement(new)
+        else:
+            new = new[~new['majority_type'].isnull()]
+        final_size = new.shape
+        print("Down to {} of {} initial features".format(final_size[1], initial_size[1]))
+        print("Removed {} rows".format(final_size[0]-initial_size[0]))
+        return new
 
     def run(self, df, docs, labels='majority_type', cols_to_drop=None, direct_to_model=False):
+        """
+        Composite function. Cleans the data, engineers desired features, and
+        splits into X and y components if desired. Also removes 'other' labels
+        and redistributes 'None' labels into their majority annotation (the
+        majority of votes cast in ann_1, ann_2 and ann_3 columns)
+        INPUTS:
+        df(pandas dataframe) - dataframe to be processed
+        docs(string) - name of column containing text samples
+        labels(string) - name of column containing labels (y-values)
+        cols_to_drop (list of strings) - names of columns to be removed from
+                                        consideration
+        direct_to_model(bool) - boolean of whether to split data into X and y
+                                components
+        OUTPUTS:
+        df(pandas df) - preprocessed dataframe (only when direct_to_model==False)
+        X(pandas df) - preprocessed dataframe containing all features (only when
+                    direct_to_model==True)
+        y - preprocessed dataframe containing labels (only when direct_to_model
+            ==True)
+        """
         # feature engineering steps
         df = self.basic_feature_engineering(df)
-        # custom step: remove 'other' from categories
-        df = df[~df[labels].isin(['other'])]
+        # custom step: remove 'other', remaining 'None's from categories
+        df = df[~df[labels].isin(['other', 'None'])]
         #remove excess columns
         less = self.prepare_data(df, remove=cols_to_drop)
         # once more, just in case
@@ -212,9 +163,126 @@ class PreProcessor(object):
             return X,y
         return df
 
+    def vectorize(self, documents, max_features=None):
+        """ Fits TfidfVectorizer on supplied corpus of documents, returns an
+        array of tfidf vectors in the shape of n_documents x n_features, where
+        n_features is <= max_features unless max_features is None, in which case
+        n_features is dependent on the corpus size.
+        INPUTS:
+        documents(1 dimensional array) - corpus of documents, each of which is
+                                        a snippet of text
+        max_features (int) - the maximum number of features allowed in the
+                            tfidf matrix; None unless stated
+        OUTPUTS:
+        vectors(sparse matrix) - Tf-idf weighted document term matrix of size
+                                [n_samples, n_features]
+        """
+        if not self.tfidf:
+            print("Creating initial TfidfVectorizer fit...")
+            self.tfidf = TfidfVectorizer(stop_words='english', \
+            tokenizer=self._tokenize, \
+            max_features=None).fit(documents)
+        vectors = self.tfidf.transform(documents).toarray()
+        words = self.tfidf.get_feature_names
+        return vectors, words
+
+    def basic_feature_engineering(self, df):
+        """Redistributes 'None' labels to the majority vote. Room for future
+        functionality for different features
+        INPUTS:
+        df (pandas dataframe) - dataframe to undergo feature engineering
+        OUTPUTS:
+        df (pandas dataframe) - dataframe with new and/or improved features
+        """
+        # translate None labels into majority opinion if possible:
+        print("Redistributing 'None' labels...")
+        df = self.fix_None_labels(df)
+        return df
+
+    def fix_None_labels(self, df):
+        """
+        For all 'None' labels, checks the votes of the three annotators,
+        and changes 'None' to the label chosen by the majority (no change in
+        the case of ties)
+        INPUTS:
+        df (pandas dataframe) - dataframe with to be fixed
+        OUTPUTS:
+        df (pandas dataframe) - dataframe with None's changed to other labels
+                                where possible
+        """
+        df['majority_type'] = df.apply(lambda row: self._none_fix_helper(row), axis=1)
+        return df
+
+    # ----------- personal utility and debugging below this line ------------ #
+    def _check_df(self, df, verbose=False, name="df"):
+        """
+        Debugging function.
+        For ensuring those pesky nulls and Nans have been dealth with.
+        """
+        #for dealing with bugs surrounding nulls
+        print("Beginning _check_df of {} for nulls...".format(name))
+        L= []
+        if verbose:
+            for c in df.columns:
+                n = df[c].isnull().sum()
+                if n:
+                    print("{} has {} nulls".format(c, n))
+                    L.append(n)
+        else:
+            for c in df.columns:
+                n = df[c].isnull().sum()
+                if n:
+                    L.append(n)
+        print("{} nulls in {} cols".format(sum(L), len(L)))
+
+    def _find_desired_power(self, Sq, power_level):
+        """
+        Helper function used for additional matrix reduction if specified
+        """
+        for i in xrange(len(Sq)):
+            if sum(Sq[:i]) >= power_level:
+                return i
+        else:
+            return len(Sq)
+
+    def _none_fix_helper(self, row):
+        """
+        Helper function in redistributing nulls.
+        """
+        cts = row[['ann_1', 'ann_2', 'ann_3']].value_counts()
+        if row['majority_type'] == 'None' and cts.max() >1:
+            x = row[['ann_1', 'ann_2', 'ann_3']].value_counts().idxmax()
+        else:
+            x = row['majority_type']
+        return x
+
+    def _replace_nulls(self, df):
+        """
+        Helper function. Used for handling nulls in specific ways depending on
+        the column (feature) they appear in.
+        """
+        print('Replacing nulls in the following categories...')
+        if 'gilded' in df.columns:
+            print('gilded: changing strings to nums, all to True/False')
+            df['gilded'].replace(to_replace=['0','1','2'], value=[0,1,2], inplace=True)
+            df['gilded'] = df['gilded'] > 0
+        elif 'post_depth' in df.columns:
+            print('post_depth: changing nulls to 0\'s')
+            df['post_depth'] = df['post_depth'].fillna(value=0)
+            nulls = sum(df['post_depth'].isnull())
+            print( "nulls in post_depth:{}".format(nulls))
+        elif 'user_reports' in df.columns:
+            print('user_reports: replacing odd values, filling nulls with 0\'s')
+            df['user_reports'] = df['user_reports'].replace(to_replace='[]', value=1)
+            df['user_reports'] = df['user_reports'].fillna(value=0)
+        else:
+            print("...none selected")
+        return df
 
     def _test_run(self, df, docs, cols_to_drop=None, sep=True, reduce_step=True):
-        #For debugging purposes
+        """
+        Debugging function. Much more verbose and flexible version of self.run.
+        """
         # basic feature engineering steps
         df = self.basic_feature_engineering(df)
         #remove excess columns
@@ -252,98 +320,35 @@ class PreProcessor(object):
         else:
             return vectors, None, None
 
+    def _tokenize(self, text, type=None):
+        """
+        Custom tokenizer. Breaks on spaces and '/'s. Uses WordNetLemmatizer to
+        lemmatize.
+        """
+        tokenizer = RegexpTokenizer(r"\s+|/", gaps=True)
+        tokens = tokenizer.tokenize(text)
+        return tokens
 
-    def _check_df(self, df, verbose=False, name="df"):
-        #for dealing with bugs surrounding nulls
-        print("Beginning _check_df of {} for nulls...".format(name))
-        L= []
-        if verbose:
-            for c in df.columns:
-                n = df[c].isnull().sum()
-                if n:
-                    print("{} has {} nulls".format(c, n))
-                    L.append(n)
-        else:
-            for c in df.columns:
-                n = df[c].isnull().sum()
-                if n:
-                    L.append(n)
-        print("{} nulls in {} cols".format(sum(L), len(L)))
-
-
-def _test(size=10000):
-    subset = train[:size]
-    df_train, df_test = train_test_split(subset, test_size=0.25)
-    print("\nBeginning test on {} rows".format(subset.shape[0]))
-    P = PreProcessor()
-    remove_most = ['Unnamed: 0', 'annotations', 'archived', 'author', 'date', \
-                   'distinguished', 'edited', 'gilded', 'in_reply_to', 'is_first_post', \
-                   'link_id', 'link_id_ann', 'majority_link', 'name',  \
-                   'parent_id', 'replies', 'retrieved_on', 'saved', \
-                   'score_hidden', 'subreddit', 'title', 'user_reports', \
-                   'ann_1', 'ann_2', 'ann_3']
-
-    X,y = P.run(df_train, 'body', cols_to_drop=remove_most)
-
-    return X,y
-
-
-
+        stemmer = WordNetLemmatizer()
+        stemmed = [stemmer.lemmatize(word) for word in tokens]
+        return stemmed
 
 
 
 if __name__ == '__main__':
     # load data
     train = pd.read_csv('data/train.csv')
-    subset = train[:1000]
+
+    #columns to be removed
     remove_most = ['Unnamed: 0', 'annotations', 'archived', 'author', 'date', \
                     'distinguished', 'edited', 'gilded', 'in_reply_to', 'is_first_post', \
                     'link_id', 'link_id_ann', 'majority_link', 'name',  \
                     'parent_id', 'replies', 'retrieved_on', 'saved', \
                     'score_hidden', 'subreddit', 'title', 'user_reports', \
                     'ann_1', 'ann_2', 'ann_3']
-    #test everything
-    X,y = _test(size=1000)
 
-    # test none_fixer
+    # segment for testing
+    subset = train[:1000]
     before = subset.majority_type.value_counts()
     P = PreProcessor()
     x,y = P.run(subset, 'body', cols_to_drop=remove_most)
-    after = y.value_counts()
-    before
-    after
-    x_fix, y_fix = P.run(train, 'body', cols_to_drop=remove_most)
-    y_fix.value_counts()
-
-
-
-    # testing for new feature (parent_id's annotation)
-    # problem: of ~3k parent_ids (/5k), only ~150 are in id's
-    subset = train[:50000].drop()
-    sum(subset.in_reply_to == subset.parent_id)
-    subset.parent_id
-    #248 of parent_id start with t3 (t3=posts, not comments)
-    len(subset[subset.parent_id.str.startswith('t3_')]['parent_id'])
-
-    d = defaultdict(str)
-    ct = 0
-    for i in subset.parent_id:
-        if i in subset.name:
-            ct += 1
-    ct
-    for i, a in zip(subset.name, subset.majority_type):
-        d[i]=a
-    test = subset.parent_id.apply(lambda x: d[x] if x in d else 'No_Parent')
-    test.value_counts()
-    for n in range(1,7):
-        z = subset[subset.parent_id.str.startswith('t{}_'.format(n))]['parent_id']
-        print len(z)
-
-
-
-    z.head()
-    len(z)
-    subset.post_depth.value_counts()
-    p_ids, ids = set(subset.parent_id), set(subset.name)
-    len(set(z))
-    len(p_ids.intersection(ids))

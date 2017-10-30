@@ -9,6 +9,10 @@ from preprocessing import PreProcessor
 
 
 class Baseline(object):
+    """
+    Blank Model for baseline models. Functions left intentionally blank.
+    Initializes with train and test data.
+    """
     def __init__(self, X_train, y_train, X_test, y_test):
         self.X_train = X_train
         self.X_test = X_test
@@ -25,6 +29,7 @@ class Baseline(object):
         return None
 
     def run(self):
+        """Runs a basic accuracy test on the model"""
         self.fit(self.X_train, self.y_train)
         y_pred = self.predict(self.X_test)
         acc = self.score(y_pred, self.y_test)
@@ -33,13 +38,27 @@ class Baseline(object):
 
 
 class WeightedGuess(Baseline):
+    """
+    Looks at the distribution of labels in the train data, and makes a random
+    guess in proportion with the label distribution (e.g. if 40% of the labels
+    in the train data are 'A', the model will guess A 40% of the time on average)
+    """
 
     def fit(self, X, y):
+        """
+        Stores the unique label values as a list. Stores the relative proportion
+        of each label as corresponding list.
+        INPUTS:
+        X - feature matrix. Traditional input to fit function, but unused here.
+        y (1-dimensional pandas dataframe) - series containing labels
+        """
         proportions = y.value_counts()/y.value_counts().sum()
         self.labels = proportions.index.values
         self.thresholds = proportions.values
 
     def predict(self,X):
+        """
+        """
         y_pred = np.random.choice(self.labels, size=(X.shape[0],), p=self.thresholds)
         return y_pred
 
@@ -102,15 +121,15 @@ def run_alt_model_tests(X_train, y_train):
     # print("RF desired scores and params\n{}\n{}".format(rf_res[0], rf_res[1]))
     print("Running grid search on GBC...")
     est = GradientBoostingClassifier()
-    GBparams = {'n_estimators': [50,100,200,400],
-                'learning_rate': [.25, .2, .15, .1, .05]}
+    GBparams = {'n_estimators': [600,800,1000,2000],
+                'learning_rate': [.1, .05, .02, .01]}
     gb_gs = GridSearchCV(est, GBparams, n_jobs=-1).fit(X_train, y_train)
     gs_res = [gb_gs.best_score_, gb_gs.best_params_]
     print("GBC desired scores and params\n{}\n{}".format(gs_res[0], gs_res[1]))
     print("Running grid search on Adaboost...")
     ada = AdaBoostClassifier()
-    ABparams = {'n_estimators': [50,100,200,400],
-                'learning_rate': [.25, .2, .15, .1, .05]}
+    ABparams = {'n_estimators': [600,800,1000,2000],
+                'learning_rate': [.1, .05, .02, .01]}
     ab_gs = GridSearchCV(ada, ABparams, n_jobs=-1).fit(X_train, y_train)
     ab_res = [ab_gs.best_score_, ab_gs.best_params_]
     print("ABC desired scores and params\n{}\n{}".format(ab_res[0], ab_res[1]))

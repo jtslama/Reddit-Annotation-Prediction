@@ -16,9 +16,12 @@ class Ensemble(object):
         self.df_train = df_train
         self.df_test = df_test
         self.dummy_col = 'is_p'
-        self.cached = None
+        self.cached_df = None
+        self.cached_label = None
         self.baselines = {}
-        self.models = {}
+        self.models = {1: GradientBoostingClassifier(n_estimators=400, learning_rate=0.05, max_depth=3),
+                    2: AdaBoostClassifier(n_estimators=400, learning_rate=0.2)}
+
         self.scores = {}
 
 
@@ -44,8 +47,8 @@ class Ensemble(object):
         output[new_col] = new_target
         return output
 
-    def run_grid(self, label_col='majority_type'):
-        X_train, y_train = self._split(self.df_train, label_col)
+    def run_grid(self, df, label_col='majority_type'):
+        X_train, y_train = self._split(df, label_col)
         blm.run_alt_model_tests(X_train, y_train)
 
     def run_baselines(self, pass_n='1', label_col='majority_type'):
@@ -64,66 +67,68 @@ class Ensemble(object):
         y = df[label_col]
         X = df.drop(label_col, axis=1)
         if old_label:
-            self.cached = X[old_label]
+            self.cached_label = X[old_label]
             X = X.drop(old_label, axis=1)
         return X,y
 
-    def create(self, targets, label_col='majority_type'):
+    def create_model(self, targets, label_col='majority_type'):
         """iterate through target parameters, making models for each
         """
-        df_train_1 = self.df_train
+        iteration_num = len(self.baselines)+1
+        if self.cached_df:
+            df_train_1 = self.cached_df
+        else:
+            df_train_1 = self.df_train
         #update labels
-        extra_labels = set(self.df_train[label_col].unique())
-        extra_labels.difference_update(set(targets.keys()))
-        if extra_labels:
-            df_train_1 = self.remove_labels(self.df_train, list(extra_labels))
+        print("Setting up targets...")
         df_train_1 = self.change_labels(df_train_1, targets, label=label_col, new_col=self.dummy_col)
         X_train, y_train = self._split(df_train_1, self.dummy_col, old_label='majority_type')
         bX_train, bX_test, by_train, by_test = train_test_split(X_train, y_train)
-        #instantiate models
+        #choose model
+        current = self.models[iteration_num]
         # LR = LogisticRegression(solver='newton-cg')
         # RF = RandomForestClassifier(n_estimators=10000, max_features=None, criterion='entropy')
-        GBC = GradientBoostingClassifier(n_estimators=100, learning_rate=0.05, max_depth=3)
-        ABC = AdaBoostClassifier(n_estimators=100, learning_rate=0.1)
-        models = [GBC, ABC]
-        iteration_num = len(self.models)+1
-        self.models[iteration_num] = models
+        print("Training and evaluating model...")
+        current.fit(X_train, y_train)
         # run baselines
         baselines = blm.run_baseline_modeling(bX_train, by_train, bX_test, by_test)
         self.baselines[iteration_num] = baselines
         #evaluate
-        cvs = []
-        for est in models:
-            cv_scores = cross_val_score(est, X_train, y_train, cv=10)
-            cvs.append(cv_scores)
-        self.scores[iteration_num] = cvs
+        cv_score = cross_val_score(current, X_train, y_train, cv=10)
+        self.scores[iteration_num] = cv_score
         print("Baseline Scores: {}".format(baselines))
         print("CV Scores: ")
-        for i, m in enumerate(models):
+        for i, m in enumerate(self.models):
             print("{}: {}".format(m, cvs[i]))
+        #update data
+        df_train_2 = self._update(current, df_train_1, X_train, y_train)
+        #for training, remove extraneous labels that switch through
+        print("Caching updated and reduced data set for future passes")
+        old_labels = set(df_train[label_col].unique())
+        extras = set(targets.keys())
+        extras.difference_update(current_labels)
+        df_train_2 = self.remove_labels(df_train_2, extras)
+        self.cached_df = df_train_2
 
-
-        """
-        if self.cached:
-            df_train_1 = self.remove_labels(df_train_1)
-            pass
-        """
-
-    def update(self, est, df, keep=[False]):
+    def _update(self, est, df, X, y, keep=[False]):
         """select portion of dataframe that contains keep"""
-        X, y = self._split(df, self.dummy_col)
-        df['log_prob'] = np.nanmax(est.predict_log_probaba(X), axis=0)
+        # add column for the log_probability of the predicted values
+        X['log_prob'] = np.nanmax(est.predict_log_probaba(X), axis=0)
+        # make predictions
         df['predicted'] = est.predict(X)
+        # set aside the 'keeps'
         new_df = df[df['predicted'].isin(keep)]
         new_df = new_df.drop(['predicted', self.dummy_col], axis=1)
         return new_df
 
-    def preliminaries(self, targets, label_col='majority_type'):
-        self.df_train = self.change_labels(self.df_train, targets, label=label_col)
-        self.df_test = self.change_labels(self.df_test, targets, label=label_col)
-        self.cached = [self.df_train[label_col]]
+    def _preliminaries(self, targets, label_col='majority_type'):
+        if self.cached_df:
+            df = self.cached_df
+        else:
+            df = self.change_labels(self.df_train, targets, label=label_col)
+            df_test = self.change_labels(self.df_test, targets, label=label_col)
         self.df_train.drop([label_col], axis=1, inplace=True)
-        self.run_grid(label_col=self.dummy_col)
+        self.run_grid(df, label_col=self.dummy_col)
 
 
 def _prep(df, size=5000, split=False):
@@ -189,8 +194,8 @@ if __name__ == '__main__':
 
     #other set
     direct_answers  = {'question': False, 'answer': True, 'elaboration': True, 'appreciation': False, 'agreement': False, 'disagreement': False, 'humor': False, 'negativereaction': False}
-    wheat_from_chaff  = {'answer': True, 'elaboration': True, 'question': True, 'appreciation': True, 'agreement': True, 'disagreement': True, 'humor': False, 'negativereaction': False}
-    tempers = {'humor': True, 'negativereaction': False}
+    discussion  = {'question': True, 'appreciation': True, 'agreement': True, 'disagreement': True, 'humor': False, 'negativereaction': False}
+    tempers = {'humor': False, 'negativereaction': True}
 
     #alts
     on_topic = {'question': 'y', 'answer': 'y', 'elaboration': 'y', 'appreciation': 'y', 'agreement': 'c', 'disagreement': 'c', 'humor': 'c', 'negativereaction': 'c'}
@@ -205,10 +210,20 @@ if __name__ == '__main__':
 
     # prepped_data = data_prep(size=60000, train_file_path='data/train.csv', split=False)
     # prepped_data.to_csv('prepped_train_data.csv')
-    # df_train, df_test = data_prep(size=1000)
+
     df = pd.read_csv('prepped_train_data.csv')
-    df = df[:20000]
+    # df = df[:5000]
     print ("Data loaded.")
     df_train, df_test = train_test_split(df)
     FirstStep = Ensemble(df_train, df_test)
-    FirstStep.preliminaries(direct_answers)
+    FirstStep.create_model(direct_answers)
+    FirstStep._preliminaries(discussion)
+
+
+    # #for local Running
+    # df_train, df_test = data_prep(size=5000)
+    # print ("Data loaded.")
+    # FirstStep = Ensemble(df_train, df_test)
+    # FirstStep.create_model(direct_answers)
+    # FirstStep.create_model(discussion)
+    # FirstStep.create_model(tempers)
