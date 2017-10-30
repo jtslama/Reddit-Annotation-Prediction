@@ -26,7 +26,19 @@ class Baseline(object):
         return None
 
     def score(self, y_pred, y, scoring='accuracy'):
-        return None
+        """
+        Calculates the accuracy of the model (#correctly classified/
+        #incorrectly classified)
+        INPUTS:
+        y_pred (numpy array) - array of predicted labels of shape [n_samples, 1]
+        y (numpy array) - array of actual labels of shape [n_samples, 1]
+        scoring (string) - currently nonfunctional. Future implentation planned
+                        for different accuracy metrics.
+        OUTPUTS:
+        acc (float) - accuracy of the model, as defined by the scoring parameter
+        """
+        acc = np.sum(y_pred==y_true)*1.0/len(y_true)
+        return acc
 
     def run(self):
         """Runs a basic accuracy test on the model"""
@@ -43,7 +55,6 @@ class WeightedGuess(Baseline):
     guess in proportion with the label distribution (e.g. if 40% of the labels
     in the train data are 'A', the model will guess A 40% of the time on average)
     """
-
     def fit(self, X, y):
         """
         Stores the unique label values as a list. Stores the relative proportion
@@ -58,27 +69,62 @@ class WeightedGuess(Baseline):
 
     def predict(self,X):
         """
+        Makes a random guess in proportion to the label distribution
+        INPUTS:
+        X (pandas dataframe or numpy array) - feature matrix of shape
+                                            [n_samples, n_features]
+        OUTPUT:
+        y_pred (numpy array) - predicted label matrix of shape [n_features, 1]
         """
         y_pred = np.random.choice(self.labels, size=(X.shape[0],), p=self.thresholds)
         return y_pred
 
-    def score(self, y_pred, y_true, scoring='accuracy'):
-        result = np.sum(y_pred==y_true)*1.0/len(y_true)
-        return result
 
 class MajorityGuess(WeightedGuess):
-
+    """
+    Looks at the distribution of labels in the train data, and guess the most
+    frequently occurring label (e.g. if 60% of the labels in the train data are
+    'A', the model will guess A every time).
+    """
     def fit(self, X, y):
+        """
+        Stores the unique label values as a list. Finds the label with the
+        highest relative frequency
+        INPUTS:
+        X - feature matrix. Traditional input to fit function, but unused here.
+        y (1-dimensional pandas dataframe) - series containing labels
+        """
         proportions = y.value_counts()/y.value_counts().sum()
         self.labels = proportions.index.values
         self.guess = np.argmax(proportions)
 
     def predict(self, X):
+        """
+        Makes a random guess in proportion to the label distribution
+        INPUTS:
+        X (pandas dataframe or numpy array) - feature matrix of shape
+                                            [n_samples, n_features]
+        OUTPUT:
+        y_pred (numpy array) - predicted label matrix of shape [n_features, 1]
+        """
         y_pred = np.full(shape=(X.shape[0],), fill_value=self.guess)
         return y_pred
 
 def run_baseline_modeling(X_train, y_train, X_test, y_test):
-    #basic guesses
+    """Function to instantiate, fit, and score the baseline models for the given
+    data. Used to benchmark other models.
+    INPUTS:
+    X_train (pandas dataframe) - train features matrix of shape
+                                [n_samples, n_features]
+    y_train (pandas dataframe) - train labels matrix of shape [n_samples, 1]
+    X_test (pandas dataframe) - test features matrix of shape
+                                [x_samples, n_features]
+    y_test (pandas dataframe) - test labels matrix of shape [x_samples, 1]
+    OUTPUTS:
+    baselines (list of floats) - list containing accuracy scores for each
+                                baseline model in order of: WeightedGuess,
+                                MajorityGuess
+    """
     # establish baseline models
     print("Running baseline models...")
     WG_acc = WeightedGuess(X_train, y_train, X_test, y_test).run()
@@ -89,20 +135,38 @@ def run_baseline_modeling(X_train, y_train, X_test, y_test):
 
 
 def run_basic_nb_models(X_train, y_train, X_test, y_test):
-    #NB
+    """
+    Helper function to run Naive Bayes Model on the data. Multinomial Naive
+    Bayes not yet implemented (would require different matrix factorizations
+    than those currently in use).
+    INPUTS:
+    X_train (pandas dataframe) - train features matrix of shape
+                                [n_samples, n_features]
+    y_train (pandas dataframe) - train labels matrix of shape [n_samples, 1]
+    X_test (pandas dataframe) - test features matrix of shape
+                                [x_samples, n_features]
+    y_test (pandas dataframe) - test labels matrix of shape [x_samples, 1]
+    OUTPUTS:
+    GNB (object) - fitted Naive Bayes model
+    GNB_scores (float) - GNB model accuracy score
+    """
     print("Running Naive Bayes models...")
     GNB = GaussianNB().fit(X_train, y_train)
-    # MNB = MultinomialNB().fit(X_train, y_train)
     GNB_scores = cross_val_score(GNB, X_test, y=y_test, cv=5, n_jobs=-1)
-    # MNB_scores = cross_val_score(MNB, X_test, y=y_test, cv=5, n_jobs=-1)
-    # Bayes_scores = [GNB_scores, MNB_scores]
-    # models = [GNB, MNB]
-    # print("Bayes scores:\n{}".format(Bayes_scores))
-    # return models, Bayes_scores
     print("Bayes scores:\n{}".format(GNB_scores))
     return GNB, GNB_scores
 
 def run_alt_model_tests(X_train, y_train):
+    """
+    Helper function for running grid searches on varying models and parameters,
+    prints best results. Mostly for exploration.
+    INPUT:
+    X_train (pandas dataframe) - train features matrix of shape
+                                [n_samples, n_features]
+    y_train (pandas dataframe) - train labels matrix of shape [n_samples, 1]
+    OUTPUT:
+    None
+    """
     #look at some basic model results:
     print("Beginning grid search...")
     # print("Running grid search on LogReg...")
@@ -143,6 +207,19 @@ def run_alt_model_tests(X_train, y_train):
 
 
 def run_alt_models(X_train, y_train, X_test, y_test):
+    """
+    Designed to compare specific models to one another.
+    INPUTS:
+    X_train (pandas dataframe) - train features matrix of shape
+                                [n_samples, n_features]
+    y_train (pandas dataframe) - train labels matrix of shape [n_samples, 1]
+    X_test (pandas dataframe) - test features matrix of shape
+                                [x_samples, n_features]
+    y_test (pandas dataframe) - test labels matrix of shape [x_samples, 1]
+    OUTPUTS:
+    models (list of objects) - list of fitted models
+    scores (list of float) - list of model accuracy scores (in the same order)
+    """
     #look at some basic model results:
     print("Running LogReg...")
     LR = LogisticRegressionCV(n_jobs=-1, cv=10, solver='newton-cg').fit(X_train, y_train)
@@ -172,14 +249,22 @@ def run_alt_models(X_train, y_train, X_test, y_test):
     models = [LR, RF, GBC, ADA]
     return models, scores
 
+
 def main(size=5000, grid=False):
+    """
+    Composite function designed for running tests.
+    INPUTS:
+    size (int) - number of rows of the data set to use
+    grid (bool) - whether or not to grid search
+    OUTPUTS:
+    None
+    """
     # prepare data for modeling
     print("Loading data...")
     train = pd.read_csv('data/train.csv')
     if size > len(train):
         df = train
     df= train[:size]
-
 
     #make splits
     print("Splitting...")
@@ -205,7 +290,7 @@ def main(size=5000, grid=False):
     nb_models, NB_base_scores = run_basic_nb_models(X_train, y_train, X_test, y_test)
 
     if grid:
-        #run gridsearch
+        #run grid search
         run_alt_model_tests(X_train, y_train, X_test, y_test)
     else:
         # look at basic model scores
@@ -223,50 +308,4 @@ def main(size=5000, grid=False):
 
 
 if __name__ == '__main__':
-    main(size=10000, grid=True)
-
-
-
-
-
-    """
-    # prepare data for modeling
-    print("Loading data...")
-    train = pd.read_csv('data/train.csv')
-    df = train[:2000]
-    df.head()
-
-
-    print("Splitting...")
-    df_train, df_test = train_test_split(df, test_size=0.25)
-
-    print("Preprocessing...")
-    P = PreProcessor()
-    remove_all_but_text = None
-
-    #TODO: deal with in_reply_to, parent_id
-    #is_first_post is a mix of false, nan and annotation values
-    #subreddit --> convert somehow?
-    #title > metric for how often words appear in reply
-    #gilded: temp removed because it's causing bugs
-    remove_most = ['Unnamed: 0', 'annotations', 'archived', 'author', 'date', \
-                   'distinguished', 'edited','gilded', 'in_reply_to', 'is_first_post', \
-                   'link_id', 'link_id_ann', 'majority_link', 'name',  \
-                   'parent_id', 'replies', 'retrieved_on', 'saved', \
-                   'score_hidden', 'subreddit', 'title', 'user_reports', 'ann_1', 'ann_2', 'ann_3']
-
-    X_train, y_train = P.run(df_train, 'body', cols_to_drop=remove_most, direct_to_model=True)
-    X_test, y_test = P.run(df_test, 'body', cols_to_drop=remove_most, direct_to_model=True)
-
-
-    # look at basic NB model results
-    nb_models, NB_base_scores = run_basic_nb_models(X_train, y_train, X_test, y_test)
-    #TODO throwing error: invalid data type (infin, Nan or too big)
-
-    # establish baseline models
-    baseline_models, baseline_scores = run_baseline_modeling(X_train, y_train)
-
-    # alternative model ideas
-    # alt_models = run_alt_model_ideas(X_train, y_train, X_test, y_test)
-    alt_models, alt_scores = run_alt_model_tests(X_train, y_train)
-    """
+    main(size=5000, grid=True)
