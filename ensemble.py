@@ -26,9 +26,11 @@ class Ensemble(object):
         self.dummy_col = 'is_p'
         self.cached_df = None
         self.cached_label = None
+        self.b_models = []
         self.baselines = {}
         self.models = {1: GradientBoostingClassifier(n_estimators=400, learning_rate=0.05, max_depth=3),
-                    2: AdaBoostClassifier(n_estimators=400, learning_rate=0.2)}
+                    2: AdaBoostClassifier(n_estimators=400, learning_rate=0.2),
+                    3: GradientBoostingClassifier(n_estimators=400, learning_rate=0.05, max_depth=3)}
         self.scores = {}
 
     def create_model(self, targets, label_col='majority_type'):
@@ -61,7 +63,8 @@ class Ensemble(object):
         print("Training and evaluating model...")
         current.fit(X_train, y_train)
         # run baselines
-        baselines = blm.run_baseline_modeling(bX_train, by_train, bX_test, by_test)
+        b, baselines = blm.run_baseline_modeling(bX_train, by_train, bX_test, by_test)
+        self.b_models.append(b)
         self.baselines[iteration_num] = baselines
         #evaluate
         cv_score = cross_val_score(current, X_train, y_train, cv=10)
@@ -95,6 +98,21 @@ class Ensemble(object):
         out = df[~df[label_col].isin(discard)]
         return out
 
+    def run_test(self, df, targets_list, label_col='majority_type'):
+        X, y = self._split(df, label_col)
+        scores = {}
+        baselines = {}
+        for step in targets_list:
+            current = self.models[step]
+            base = self.run_baselines(X, y, pass_n=step)
+            score = current.score(X,y)
+            print("Step {} Accuracy Score: {}".format(step, score))
+            print("Step {} Baseline Scores: {}".format(step, base))
+            scores[step] = score
+            baselines[step]= base
+        self.test_scores = scores
+        return scores, baselines
+
     def change_labels(self, df, targets, label='majority_type', new_col='is_p'):
         """
         Adds a column to a dataframe according to target parameters
@@ -114,17 +132,22 @@ class Ensemble(object):
         output[new_col] = new_target
         return output
 
-    def run_baselines(self, pass_n='1', label_col='majority_type'):
+    def run_baselines(self, X, y, pass_n='1', label_col='majority_type'):
         """Runs baseline models in the train and test sets, storing their accuracies
         as [WeightedGuess_accuracy, 'GuessMostFrequent_accuracy'].
+        X - features matrix
+        y - labels matrix
         pass_n (string) - number appended to the storage name, allowing baselines to be run at different levels
         label_col (string) - column name containing target labels (y-values).
         """
-        X_train, y_train = self._split(self.df_train, label_col)
-        X_test, y_test = self._split(self.df_test, label_col)
-        baseline_accuracies = blm.run_baseline_modeling(X_train, y_train, X_test, y_test)
-        self.scores['baselines_{}'.format(pass_n)] = baseline_accuracies
-        print("Baseline scores on pass {}: {}".format(pass_n, baseline_accuracies))
+        models = self.b_models[int(pass_n)]
+        b_acc = []
+        for m in models:
+            score = m.run_test(X,y)
+            b_acc.append(score)
+        print("Baseline scores on pass {}: {}".format(pass_n, b_acc))
+        return b_acc
+
     # --------------- private helper functions below this line -------------- #
     def _preliminaries(self, targets, label_col='majority_type'):
         """Helper function for preliminary research on a particular step"""
@@ -203,36 +226,29 @@ def data_prep(size=5000, train_file_path='data/train.csv', split=True):
 
 
 if __name__ == '__main__':
-    #ideas for an ensemble
-    relevant_ans = {'question': 'notanswer', 'answer': 'direct', 'elaboration': 'direct', 'appreciation': 'notanswer', 'agreement': 'notanswer', 'disagreement': 'notanswer', 'humor': 'notanswer', 'negativereaction': 'notanswer'}
-    argument = {'question': 'neutral', 'answer': 'other', 'elaboration': 'other', 'appreciation': 'positive', 'agreement': 'positive', 'disagreement': 'negative', 'humor': 'neutral', 'negativereaction': 'negative'}
 
-    #other set
+    #sets of interest
     direct_answers  = {'question': False, 'answer': True, 'elaboration': True, 'appreciation': False, 'agreement': False, 'disagreement': False, 'humor': False, 'negativereaction': False}
     discussion  = {'question': True, 'appreciation': True, 'agreement': True, 'disagreement': True, 'humor': False, 'negativereaction': False}
     tempers = {'humor': False, 'negativereaction': True}
 
-    #alts
-    on_topic = {'question': 'y', 'answer': 'y', 'elaboration': 'y', 'appreciation': 'y', 'agreement': 'c', 'disagreement': 'c', 'humor': 'c', 'negativereaction': 'c'}
-    neg_2 = {'agreement': 'p', 'disagreement': 'p', 'humor': 'p', 'negativereaction': 'n'}
-    #try changing label paradigm
-    support_disrupt = {'question': 'support', 'answer': 'support', 'elaboration': 'support', 'appreciation': 'support', 'agreement': 'support', 'disagreement': 'support', 'humor': 'disrupt', 'negativereaction': 'disrupt'}
-    response_digression = {'question': 'response', 'answer': 'response', 'elaboration': 'response', 'appreciation': 'digression', 'agreement': 'response', 'disagreement': 'digression', 'humor': 'digression', 'negativereaction': 'digression'}
-    conflict = {'question': 'support', 'answer': 'support', 'elaboration': 'support', 'appreciation': 'support', 'agreement': 'support', 'disagreement': 'disrupt', 'humor': 'support', 'negativereaction': 'disrupt'}
-    negative_rxn = {'question': 'pos', 'answer': 'pos', 'elaboration': 'pos', 'appreciation': 'pos', 'agreement': 'pos', 'disagreement': 'neutral', 'humor': 'neutral', 'negativereaction': 'negative'}
-
-
-
-    # prepped_data = data_prep(size=60000, train_file_path='data/train.csv', split=False)
-    # prepped_data.to_csv('prepped_train_data.csv')
 
     df = pd.read_csv('prepped_train_data.csv')
-    # df = df[:5000]
     print ("Data loaded.")
     df_train, df_test = train_test_split(df)
     FirstStep = Ensemble(df_train, df_test)
-    FirstStep.create_model(direct_answers)
-    FirstStep._preliminaries(discussion)
+    steps = [direct_answers, discussion, tempers]
+    for s in steps:
+        FirstStep.create_model(s)
+
+    test_df = data_prep(size=60000, train_file_path='data/test1.csv', split=False)
+    model_results, baseline_results = FirstStep.run_test(test_df, steps)
+
+    print("Results")
+    for step in model_results:
+        print("{}:".format(step))
+        print("Model: {}".format(model_results[step]))
+        print("Baseline: {}".format(baseline_results[step]))
 
 
     # #for local Running
