@@ -9,7 +9,6 @@ from sklearn.model_selection import train_test_split,  cross_val_score
 from sklearn.decomposition import TruncatedSVD
 import numpy as np
 from collections import defaultdict
-import matplotlib.pyplot as plt
 
 
 class PreProcessor(object):
@@ -18,9 +17,6 @@ class PreProcessor(object):
     """
     def __init__(self):
         self._make_consensus = False
-        self.stemmers = {'WordNetLemmatizer': WordNetLemmatizer,
-                         'SnowballStemmer': SnowballStemmer,
-                         'PorterStemmer': PorterStemmer}
         self.SVD = None
         self.tfidf = None
 
@@ -174,6 +170,8 @@ class PreProcessor(object):
     def run(self, df, docs, labels='majority_type', cols_to_drop=None, direct_to_model=False):
         # feature engineering steps
         df = self.basic_feature_engineering(df)
+        # custom step: remove 'other' from categories
+        df = df[~df[labels].isin(['other'])]
         #remove excess columns
         less = self.prepare_data(df, remove=cols_to_drop)
         # once more, just in case
@@ -242,7 +240,8 @@ class PreProcessor(object):
             seq = xrange(min(len(df_U), len(less)))
             df_U['fixit'], less['fixit'] = seq, seq
             df = pd.concat([d.reset_index() for d in [less, df_U]], axis=1, ignore_index=True)
-            df = df.drop(['fixit'], axis=1)
+            if 'fixit' in df.columns:
+                df = df.drop(['fixit'], axis=1)
             print("Done.\n")
             if sep:
                 y = df['majority_type']
@@ -290,35 +289,7 @@ def _test(size=10000):
 
 
 
-# def graph_latent_feature_power(sigma_matrix, save_as=None):
-#     power = sigma_matrix ** 2
-#     y = np.cumsum(power)/np.sum(power)
-#     X = xrange(len(y))
-#     plt.figure(figsize=(20,20))
-#     plt.plot((0,len(y)),(0.9,0.9), 'r-')
-#     plt.plot((0,len(y)),(0.95,0.95), 'g-')
-#     plt.plot((0,len(y)),(0.99,0.99), 'b-')
-#     plt.scatter(X,y)
-#     if save_as:
-#         plt.savefig('{}.png'.format(save_as))
-#     plt.show()
 
-def graph_label_distribs(series, save_as=None):
-    total = series.sum()
-    d = dict(series)
-    ordered = sorted(zip(d.values(), d.keys()))
-    heights, labels = zip(*ordered)
-    heights = [h*1.0/total for h in heights]
-    positions = xrange(len(heights))
-
-    plt.figure(figsize=(10,10))
-    plt.bar(positions, heights, alpha=0.5)
-    plt.xticks(positions, labels, rotation=45)
-    plt.ylabel('Proportion of Comments')
-    plt.title('Comment Types')
-    if save_as:
-        plt.savefig('{}.png'.format(save_as))
-    plt.show()
 
 
 if __name__ == '__main__':
@@ -343,7 +314,7 @@ if __name__ == '__main__':
     after
     x_fix, y_fix = P.run(train, 'body', cols_to_drop=remove_most)
     y_fix.value_counts()
-    graph_label_distribs(y_fix.value_counts())
+
 
 
     # testing for new feature (parent_id's annotation)
@@ -376,12 +347,3 @@ if __name__ == '__main__':
     p_ids, ids = set(subset.parent_id), set(subset.name)
     len(set(z))
     len(p_ids.intersection(ids))
-
-
-
-    """
-    # For graphing purposes
-    power = pd.read_csv('/Users/jt/Desktop/ex_var_ratios.csv', header=None)
-    %pwd
-    graph_latent_feature_power(power)
-    """

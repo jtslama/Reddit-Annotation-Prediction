@@ -21,6 +21,9 @@ class Baseline(object):
     def predict(self, X):
         return None
 
+    def score(self, y_pred, y, scoring='accuracy'):
+        return None
+
     def run(self):
         self.fit(self.X_train, self.y_train)
         y_pred = self.predict(self.X_test)
@@ -40,9 +43,9 @@ class WeightedGuess(Baseline):
         y_pred = np.random.choice(self.labels, size=(X.shape[0],), p=self.thresholds)
         return y_pred
 
-    def score(self, y_pred, y_true):
-        accuracy = np.sum(y_pred==y_true)*1.0/len(y_true)
-        return accuracy
+    def score(self, y_pred, y_true, scoring='accuracy'):
+        result = np.sum(y_pred==y_true)*1.0/len(y_true)
+        return result
 
 class MajorityGuess(WeightedGuess):
 
@@ -80,46 +83,44 @@ def run_basic_nb_models(X_train, y_train, X_test, y_test):
     print("Bayes scores:\n{}".format(GNB_scores))
     return GNB, GNB_scores
 
-def run_alt_model_tests(X_train, y_train, X_test, y_test):
+def run_alt_model_tests(X_train, y_train):
     #look at some basic model results:
-    print("Running grid search on LogReg...")
-    lr = LogisticRegressionCV()
-    LRparams = {'solver': ['lbfgs', 'liblinear', 'newton-cg', 'sag']}
-    lr_gs = GridSearchCV(lr, LRparams, n_jobs=-1).fit(X_train, y_train)
-    lr_res = [lr_gs.best_score_, lr_gs.best_params_]
-    print("LogReg desired scores and params\n{}\n{}".format(lr_res[0], lr_res[1]))
-
-    print("Running grid search on RF...")
-    rf = RandomForestClassifier()
-    RFparams = {'criterion': ['gini', 'entropy'],
-                'max_features': ["auto", "sqrt", "log2", None]}
-    rf_gs = GridSearchCV(rf, RFparams, n_jobs=-1, ).fit(X_train, y_train)
-    rf_res = [rf_gs.best_score_, rf_gs.best_params_]
-    print("RF desired scores and params\n{}\n{}".format(rf_res[0], rf_res[1]))
-
+    print("Beginning grid search...")
+    # print("Running grid search on LogReg...")
+    # lr = LogisticRegressionCV()
+    # LRparams = {'solver': ['lbfgs', 'liblinear', 'newton-cg', 'sag']}
+    # lr_gs = GridSearchCV(lr, LRparams, n_jobs=-1).fit(X_train, y_train)
+    # lr_res = [lr_gs.best_score_, lr_gs.best_params_]
+    # print("LogReg desired scores and params\n{}\n{}".format(lr_res[0], lr_res[1]))
+    #
+    # print("Running grid search on RF...")
+    # rf = RandomForestClassifier()
+    # RFparams = {'criterion': ['gini', 'entropy'],
+    #             'max_features': ["auto", "sqrt", "log2", None]}
+    # rf_gs = GridSearchCV(rf, RFparams, n_jobs=-1, ).fit(X_train, y_train)
+    # rf_res = [rf_gs.best_score_, rf_gs.best_params_]
+    # print("RF desired scores and params\n{}\n{}".format(rf_res[0], rf_res[1]))
     print("Running grid search on GBC...")
     est = GradientBoostingClassifier()
-    GBparams = {'n_estimators': [200,400,600],
-                'learning_rate': [.1, .05, .02],
-                'max_depth': [2, 3, 5]}
+    GBparams = {'n_estimators': [50,100,200,400],
+                'learning_rate': [.25, .2, .15, .1, .05]}
     gb_gs = GridSearchCV(est, GBparams, n_jobs=-1).fit(X_train, y_train)
     gs_res = [gb_gs.best_score_, gb_gs.best_params_]
     print("GBC desired scores and params\n{}\n{}".format(gs_res[0], gs_res[1]))
-
     print("Running grid search on Adaboost...")
     ada = AdaBoostClassifier()
-    ABparams = {'n_estimators': [200,400,600],
-                'learning_rate': [.1, .05, .02]}
+    ABparams = {'n_estimators': [50,100,200,400],
+                'learning_rate': [.25, .2, .15, .1, .05]}
     ab_gs = GridSearchCV(ada, ABparams, n_jobs=-1).fit(X_train, y_train)
     ab_res = [ab_gs.best_score_, ab_gs.best_params_]
     print("ABC desired scores and params\n{}\n{}".format(ab_res[0], ab_res[1]))
 
     print("\nFinal Results:")
-    print("LogReg desired scores and params\n{}\n{}".format(lr_res[0], lr_res[1]))
-    print("RF desired scores and params\n{}\n{}".format(rf_res[0], rf_res[1]))
+    # print("LogReg desired scores and params\n{}\n{}".format(lr_res[0], lr_res[1]))
+    # print("RF desired scores and params\n{}\n{}".format(rf_res[0], rf_res[1]))
     print("GBC desired scores and params\n{}\n{}".format(gs_res[0], gs_res[1]))
     print("ABC desired scores and params\n{}\n{}".format(ab_res[0], ab_res[1]))
-    return [lr_gs, rf_gs, gb_gs, ab_gs]
+    # return [lr_gs, rf_gs, gb_gs, ab_gs]
 
 
 def run_alt_models(X_train, y_train, X_test, y_test):
@@ -238,10 +239,6 @@ if __name__ == '__main__':
     X_train, y_train = P.run(df_train, 'body', cols_to_drop=remove_most, direct_to_model=True)
     X_test, y_test = P.run(df_test, 'body', cols_to_drop=remove_most, direct_to_model=True)
 
-    #NOTE for this one instance only. In future, .run will handle the separation
-    # y_train = df_train['majority_type'],
-    # X_train =  df_train.drop(['majority_type'], axis=1)
-    # y_test, X_test = df_test['majority_type'], df_test.drop(['majority_type'], axis=1)
 
     # look at basic NB model results
     nb_models, NB_base_scores = run_basic_nb_models(X_train, y_train, X_test, y_test)
