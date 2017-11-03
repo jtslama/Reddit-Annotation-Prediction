@@ -7,6 +7,20 @@ import praw
 from initial_data_loading import load_discourse_data
 from reddit_config import login_details
 
+"""
+This scraper works with praw (a Reddit API wrapper), which requires the scraper
+to be linked to an account. These details must be provided for the script to
+work.
+Login_details are stored as dictionary, with the following key, value
+pairs (all as strings):
+
+SCRIPT_NAME - the name for this script
+CLIENT_ID - provided by reddit when you register the scraper
+CLIENT_SECRET - provided by reddit when you register the scraper
+USERNAME - the username of the account linked to the scraper
+PASSWORD - the password of that account
+"""
+
 
 class Reddit_Scraper(object):
     """
@@ -176,14 +190,12 @@ if __name__ == '__main__':
     print("Loading {}...".format(coarse_json))
     coarse_df = load_discourse_data(coarse_json)
     urls = list(coarse_df.url)
-    # scraper broke on url #1983
-    urls = urls[1982:]
     print("{} loaded".format(coarse_json))
     # try to scrape items on the list
     print("logging in...")
     Date_Finder = Reddit_Scraper(login_details,
                                  date_file='data/list_of_dates.csv',
                                  error_file='data/error_log.csv',
-                                 user_agent='testing date_finder by ArSlatehorn')
+                                 user_agent='testing date_finder by {}'.format(login_details['USERNAME']))
     print("searching for dates...")
     dates = Date_Finder.get_dates(urls)
