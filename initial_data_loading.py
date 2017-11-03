@@ -9,24 +9,6 @@ import re
 from collections import defaultdict
 import json
 
-# def load_data_from_jsons(filepath):
-#     """
-#     Since I keep doing it, and its a pain every time:
-#     The steps necessary to take the file of a list of json objects and compile it
-#     into a pandas DataFrame
-#     """
-#     # read file into a list
-#     with open(filepath, 'r') as f:
-#         lines = f.readlines()
-#     # remove newline chars, change true (invalid) to True (bool)
-#     rows = [lin.rstrip().replace('true', 'True') for lin in lines]
-#     rows_fixed = [r.replace('true', 'True') for r in rows]
-#     # now each string can be made to a dictionary
-#     dictified = [ast.literal_eval(rf) for rf in rows_fixed]
-#     # then loaded into a pandas DataFrame
-#     df = pd.DataFrame(dictified)
-#     return df
-
 
 def load_data_from_jsons(filepath):
     """
@@ -157,13 +139,13 @@ def test(annotations, comments):
 if __name__ == '__main__':
     # make normalized_list_of_dates
     scraped_dates = 'data/list_of_dates.csv'
+
     # make a file with which to search the table
     df = prep_dates(scraped_dates, outfile='data/search_table.csv', out=False)
-    df['yr-month'].value_counts().head()
+
     #for visualization
     orig_json_file = 'data/coarse_discourse_dataset.json'
     coarse_df = load_data_from_jsons(orig_json_file)
-    coarse_df[coarse_df.isnull().any(axis=1)]
 
     #load some data
     later_reddit_data = 'data/RC_2008-11'
@@ -171,78 +153,7 @@ if __name__ == '__main__':
 
     later_df = load_data_from_jsons(later_reddit_data)
     useless = show_usefulness(df)
-    useless
     simp_later = simplify(later_df)
 
-    #small test
     # smush together scraped dates, link_ids with annotation data
     test_df = small_test_prep(coarse_df, df)
-    # try to get comments
-    # check to see that there are comments from an annotation thread in 11/2008 in later_df
-    a = later_df[later_df['link_id'] == 't3_7bfl5']
-    # try to get their contents out
-    test_df.head()
-    later_df.head()
-
-    desired_I = test(test_df, later_df)
-    D
-
-    len(test_df)
-    len(ann)
-    r = []
-    # ann['ann_key]'] = xrange(len(ann))
-    for i, post in enumerate(ann['posts']):
-        for comment in post:
-            comment['ann_key'] = i
-            r.append(comment)
-    d = pd.DataFrame(r)
-
-    f = d.set_index('ann_key')
-    g= f.join(ann)
-    g.drop(['posts','yr-month', 'epoch_date', 'url'], axis=1, inplace=True)
-    g.drop('ann_key]', axis=1, inplace=True)
-    #fix resulting nulls
-    g.head(20)
-    g.columns
-    g.post_depth = g.post_depth.fillna(value=0)
-    g.in_reply_to = g.in_reply_to.fillna(value='none')
-    g.majority_link = g.majority_link.fillna(value='none')
-    g.majority_type = g.majority_type.fillna(value='none')
-    g.is_first_post = g.is_first_post.fillna(value=False)
-    g.reset_index(drop=True, inplace=True)
-    fills = {"in_reply_to": None, "is_first_post": False}
-    pd.isnull(g).sum()
-    g[g.isnull().any(axis=1)]
-    len(g.dropna())
-
-
-    for i, r in enumerate(ann['subreddit'].head(10)):
-        print i, r
-
-
-
-    ann.head()
-    ann.posts.head(10)
-    r = []
-    for row in ann['posts'].head(20):
-        for a in row:
-            d = pd.DataFrame(a)
-            r.append(d)
-
-    ann2 = pd.concat(r, axis=0)
-    ann2.head()
-    type(ann2)
-    ann3 = ann2.transpose()
-    ann3
-
-    """
-        for a,s,d,l in posts, subs, date, link_id:
-            d = pd.DataFrame(a).concat(ann[[s,d,l]], names=['subreddit', 'date', 'link_id'], axis=1)
-            r.append(d)
-
-    ""
-
-
-    # there's a ton. Let's get rid of some columns I don't need
-    early = simplify(comment_df)
-    later = simplify(later_df)
