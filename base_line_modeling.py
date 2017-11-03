@@ -5,6 +5,7 @@ from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier,
 from sklearn.linear_model import LogisticRegressionCV, LogisticRegression
 from sklearn.grid_search import GridSearchCV
 from sklearn.model_selection import train_test_split,  cross_val_score
+from sklearn.metrics import recall_score, precision_score
 from preprocessing import PreProcessor
 
 
@@ -25,7 +26,7 @@ class Baseline(object):
     def predict(self, X):
         return None
 
-    def score(self, y_pred, y, scoring='accuracy'):
+    def score(self, y_pred, y, scoring=['accuracy']):
         """
         Calculates the accuracy of the model (#correctly classified/
         #incorrectly classified)
@@ -37,16 +38,35 @@ class Baseline(object):
         OUTPUTS:
         acc (float) - accuracy of the model, as defined by the scoring parameter
         """
-        acc = np.sum(y_pred==y_true)*1.0/len(y_true)
+        acc = []
+
+        if 'accuracy' in scoring:
+            acc1 = np.sum(y_pred==y)*1.0/len(y)
+            acc.append(acc1)
+        if 'recall' in scoring:
+            acc2 = recall_score(y, y_pred)
+            acc.append(acc2)
+        if 'precision' in scoring:
+            acc3 = precision_score(y, y_pred)
+            acc.append(acc3)
         return acc
 
-    def run(self):
+    def run(self, score_type=['accuracy', 'recall', 'precision']):
         """Runs a basic accuracy test on the model"""
         self.fit(self.X_train, self.y_train)
         y_pred = self.predict(self.X_test)
-        acc = self.score(y_pred, self.y_test)
-        print("Accuracy score of {}".format(acc))
+        y_pred, self.y_test = y_pred.astype(np.bool_), self.y_test.astype(np.bool_)
+        # print("y_pred shape, type: {}, {}".format(y_pred.shape, type(y_pred)))
+        # print("y_pred uniques: {}".format(np.unique(y_pred)))
+        # print("y_true shape, type: {}, {}".format(self.y_test.shape, type(y_pred)))
+        # print("y_true uniques: {}".format(np.unique(self.y_test)))
+        acc = self.score(y_pred, self.y_test, scoring=score_type)
+        for i, s_type in enumerate(score_type):
+            print("{} score of {}".format(s_type, acc[i]))
         return acc
+
+    def run_test(self, X, y):
+        y_pred = self.predict(self.X_test)
 
 
 class WeightedGuess(Baseline):
@@ -63,7 +83,7 @@ class WeightedGuess(Baseline):
         X - feature matrix. Traditional input to fit function, but unused here.
         y (1-dimensional pandas dataframe) - series containing labels
         """
-        proportions = y.value_counts()/y.value_counts().sum()
+        proportions = 1.0*y.value_counts()/y.value_counts().sum()
         self.labels = proportions.index.values
         self.thresholds = proportions.values
 
@@ -127,14 +147,18 @@ def run_baseline_modeling(X_train, y_train, X_test, y_test):
     """
     # establish baseline models
     print("Running baseline models...")
-    WG_acc = WeightedGuess(X_train, y_train, X_test, y_test).run()
-    MJ_acc = MajorityGuess(X_train, y_train, X_test, y_test).run()
+    WG = WeightedGuess(X_train, y_train, X_test, y_test)
+    print("Weighted Guess scores: ")
+    WG_acc = WG.run(score_type=['accuracy', 'recall', 'precision'])
+    MJ = MajorityGuess(X_train, y_train, X_test, y_test)
+    print("Majority Guess scores: ")
+    MJ_acc = MJ.run(score_type=['accuracy', 'recall', 'precision'])
+    models = [WG, MJ]
     baselines = [WG_acc, MJ_acc]
-    print("Baseline scores: {}".format(baselines))
-    return baselines
+    return models, baselines
 
 
-def run_basic_nb_models(X_train, y_train, X_test, y_test):
+def run_basic_nb_models(X_train, y_train, X_test, y_test, score_type='accuracy'):
     """
     Helper function to run Naive Bayes Model on the data. Multinomial Naive
     Bayes not yet implemented (would require different matrix factorizations
@@ -152,11 +176,11 @@ def run_basic_nb_models(X_train, y_train, X_test, y_test):
     """
     print("Running Naive Bayes models...")
     GNB = GaussianNB().fit(X_train, y_train)
-    GNB_scores = cross_val_score(GNB, X_test, y=y_test, cv=5, n_jobs=-1)
+    GNB_scores = cross_val_score(GNB, X_test, y=y_test, cv=5, n_jobs=-1, scoring=score_type)
     print("Bayes scores:\n{}".format(GNB_scores))
     return GNB, GNB_scores
 
-def run_alt_model_tests(X_train, y_train):
+def run_alt_model_tests(X_train, y_train, score_type='accuracy'):
     """
     Helper function for running grid searches on varying models and parameters,
     prints best results. Mostly for exploration.
@@ -169,32 +193,33 @@ def run_alt_model_tests(X_train, y_train):
     """
     #look at some basic model results:
     print("Beginning grid search...")
-    # print("Running grid search on LogReg...")
-    # lr = LogisticRegressionCV()
-    # LRparams = {'solver': ['lbfgs', 'liblinear', 'newton-cg', 'sag']}
-    # lr_gs = GridSearchCV(lr, LRparams, n_jobs=-1).fit(X_train, y_train)
-    # lr_res = [lr_gs.best_score_, lr_gs.best_params_]
-    # print("LogReg desired scores and params\n{}\n{}".format(lr_res[0], lr_res[1]))
-    #
-    # print("Running grid search on RF...")
-    # rf = RandomForestClassifier()
-    # RFparams = {'criterion': ['gini', 'entropy'],
-    #             'max_features': ["auto", "sqrt", "log2", None]}
-    # rf_gs = GridSearchCV(rf, RFparams, n_jobs=-1, ).fit(X_train, y_train)
-    # rf_res = [rf_gs.best_score_, rf_gs.best_params_]
-    # print("RF desired scores and params\n{}\n{}".format(rf_res[0], rf_res[1]))
+    print("Running grid search on LogReg...")
+    lr = LogisticRegressionCV()
+    LRparams = {'solver': ['newton-cg']}
+    lr_gs = GridSearchCV(lr, LRparams, n_jobs=-1, scoring=score_type).fit(X_train, y_train)
+    lr_res = [lr_gs.best_score_, lr_gs.best_params_]
+    print("LogReg desired scores and params\n{}\n{}".format(lr_res[0], lr_res[1]))
+
+    print("Running grid search on RF...")
+    rf = RandomForestClassifier()
+    RFparams = {'criterion': ['entropy'],
+                'n_estimators': [5000],
+                'max_features': [None]}
+    rf_gs = GridSearchCV(rf, RFparams, n_jobs=-1,scoring=score_type).fit(X_train, y_train)
+    rf_res = [rf_gs.best_score_, rf_gs.best_params_]
+    print("RF desired scores and params\n{}\n{}".format(rf_res[0], rf_res[1]))
     print("Running grid search on GBC...")
     est = GradientBoostingClassifier()
-    GBparams = {'n_estimators': [600,800,1000,2000],
+    GBparams = {'n_estimators': [400,600,800],
                 'learning_rate': [.1, .05, .02, .01]}
-    gb_gs = GridSearchCV(est, GBparams, n_jobs=-1).fit(X_train, y_train)
+    gb_gs = GridSearchCV(est, GBparams, n_jobs=-1, scoring=score_type).fit(X_train, y_train)
     gs_res = [gb_gs.best_score_, gb_gs.best_params_]
     print("GBC desired scores and params\n{}\n{}".format(gs_res[0], gs_res[1]))
     print("Running grid search on Adaboost...")
     ada = AdaBoostClassifier()
-    ABparams = {'n_estimators': [600,800,1000,2000],
+    ABparams = {'n_estimators': [400,600,800],
                 'learning_rate': [.1, .05, .02, .01]}
-    ab_gs = GridSearchCV(ada, ABparams, n_jobs=-1).fit(X_train, y_train)
+    ab_gs = GridSearchCV(ada, ABparams, n_jobs=-1, scoring=score_type).fit(X_train, y_train)
     ab_res = [ab_gs.best_score_, ab_gs.best_params_]
     print("ABC desired scores and params\n{}\n{}".format(ab_res[0], ab_res[1]))
 

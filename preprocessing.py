@@ -4,11 +4,10 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from nltk.stem.wordnet import WordNetLemmatizer
 from nltk.tokenize import RegexpTokenizer
 from nltk.stem import WordNetLemmatizer, SnowballStemmer, PorterStemmer
-from sklearn.naive_bayes import GaussianNB, MultinomialNB
-from sklearn.model_selection import train_test_split,  cross_val_score
 from sklearn.decomposition import TruncatedSVD
 import numpy as np
 from collections import defaultdict
+
 
 
 class PreProcessor(object):
@@ -20,7 +19,7 @@ class PreProcessor(object):
         self.SVD = None
         self.tfidf = None
 
-    def matrix_reduction(self, matrix, n_comp=2000, power_level=None):
+    def matrix_reduction(self, matrix, n_comp=2000, power_level=1):
         """
         INPUTS:
         matrix(numpy array) - the matrix to be reduced
@@ -36,10 +35,10 @@ class PreProcessor(object):
         """
         initial_size = matrix.shape
         if power_level>1:
-            print "No. Power level can't be more than 1. Setting power_level to 0.9"
+            print("No. Power level can't be more than 1. Setting power_level to 0.9")
             power_level=0.9
         if n_comp >= matrix.shape[1]:
-            print "n_comp must be between 2 and the original number of features. Setting to half of original features"
+            print("n_comp must be between 2 and the original number of features. Setting to half of original features")
             n_comp = min(2000, matrix.shape[1]-1)
         #decompose matrix into U,S,V components
         #fit the SVD model the first time around (use train data)
@@ -95,7 +94,7 @@ class PreProcessor(object):
             new = new[~new['majority_type'].isnull()]
         final_size = new.shape
         print("Down to {} of {} initial features".format(final_size[1], initial_size[1]))
-        print("Removed {} rows".format(final_size[0]-initial_size[0]))
+        print("Removed {} rows".format(initial_size[0]-final_size[0]))
         return new
 
     def run(self, df, docs, labels='majority_type', cols_to_drop=None, direct_to_model=False):
@@ -135,7 +134,7 @@ class PreProcessor(object):
         vectors, vocabulary = self.vectorize(documents)
         #shrink resulting tfidf_vectors
         print("Reducing tfidf vector dimensions...")
-        U, S = self.matrix_reduction(vectors, power_level=None)
+        U, S = self.matrix_reduction(vectors, power_level=1)
         print("Reconstructing DataFrame...")
         df_U = pd.DataFrame(U)
         seq = xrange(min(len(less), len(df_U)))
@@ -338,7 +337,6 @@ class PreProcessor(object):
 if __name__ == '__main__':
     # load data
     train = pd.read_csv('data/train.csv')
-
     #columns to be removed
     remove_most = ['Unnamed: 0', 'annotations', 'archived', 'author', 'date', \
                     'distinguished', 'edited', 'gilded', 'in_reply_to', 'is_first_post', \
