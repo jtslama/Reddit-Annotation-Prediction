@@ -3,7 +3,7 @@ by John Slama, 10/9/17-10/30/17
 
 ##### Categorizing discourse on Reddit, with a focus on identifying negative comments
 
-![datascope](app/static/images/datascope.PNG)
+![datascope](app/static/images/datascope.png)
 
 
 ## Overview
@@ -41,12 +41,40 @@ My final dataset used 2000 vocabulary features and 7 features related to the com
 ## Initial Modeling
 The data is skewed: approximately 40% of the comments are Answers and less than 2% are Negative Reactions. As a result, basic classifiers (Random Forest, Naive Bayes, Logistic Regression, etc.) result in high accuracy (most things aren't Negative Reactions) and very low recall and precision. This isn't far different from a baseline model that just makes a random guess in proportion to the label distribution (i.e. it guesses Negative Reaction approximately 2% of the time), which performs similarly, though it is better than a model which just guesses the most common class (nothing is a Negative Reaction).
 
-![BResults](images/BasicResults.PNG)
+<table>
+  <tr>
+   <td>Model</td>
+   <td>Accuracy</td>
+   <td>Recall</td>
+   <td>Precision</td>
+  </tr>
+  <tr>
+   <td>Guess Most Frequent Label</td>
+   <td>97%</td>
+   <td>0%</td>
+   <td><strong>0%</strong></td>
+  </tr>
+  <tr>
+   <td>Weighted Random Guess</td>
+   <td>95%</td>
+   <td>1%</td>
+   <td><strong>1%</strong></td>
+  </tr>
+  <tr>
+   <td>Basic Binary Classifiers</td>
+   <td>97%</td>
+   <td>1%</td>
+   <td><strong>0%</strong></td>
+  </tr>
+ </table>
 
 ## Ensemble
 To address this issue, I created an ensemble model. I set up 3 tiers.
 
-![EnsembleStructure](images/EnsembleStructure.PNG)
+
+<img src="https://raw.github.com/jtslama/Reddit-Annotation-Prediction/tree/master/images/EnsembleStructure.png" align="center">
+
+![EnsembleStructure](images/EnsembleStructure.png)
 
 * 1) Tier 1 is a model which determines whether the comments are Answers/Elaborations or something else (all other categories). If it predicts they are not Answers or Elaborations, it passes them to the second tier.
 * 2) Tier 2 determines whether the comments are Humor/Negative Reactions or something else (Question, Disagreement, Agreement, Appreciation). It passes the Humor and Negative Reactions to the final tier.
@@ -54,10 +82,41 @@ To address this issue, I created an ensemble model. I set up 3 tiers.
 
 Each tier can have a different model type that can be tuned with different hyperparameters. The ensemble setup I used consisted of a GradientBoostingClassifier for Tier 1, an AdaBoostClassifier for Tier 2, and a GradientBoostingClassifier for Tier 3.
 
-![FResults](images/FResults.PNG)
+<table>
+  <tr>
+   <td>Model</td>
+   <td>Accuracy</td>
+   <td>Recall</td>
+   <td>Precision</td>
+  </tr>
+  <tr>
+   <td>Guess Most Frequent Label</td>
+   <td>97%</td>
+   <td>0%</td>
+   <td><strong>0%</strong></td>
+  </tr>
+  <tr>
+   <td>Weighted Random Guess</td>
+   <td>95%</td>
+   <td>1%</td>
+   <td><strong>1%</strong></td>
+  </tr>
+  <tr>
+   <td>Basic Binary Classifiers</td>
+   <td>97%</td>
+   <td>1%</td>
+   <td><strong>0%</strong></td>
+  </tr>
+  <tr>
+   <td>Three Tier Ensemble</td>
+   <td>70%</td>
+   <td>65%</td>
+   <td><strong>76%</strong></td>
+  </tr>
+ </table>
 
 ## Results
-The Ensemble greatly outperforms the baseline model and the basic classifiers. The metric of importance here is precision, the fraction of declared postives (classified as Negative Reactions) that are true positives (actual Negative reactions). The higher this measure is, the better this tool is. We want an aid that will highlight comments for additional moderation. To avoid wasting the moderators' time, we want to avoid false positives (falsely classifying a comment as a Negative Reaction when it is not), and precision tells us how well we are doing. Secondary to this is Recall, how many of the Negative Reactions our model is catching. In both metrics, the Ensemble greatly outperforms the baselines and basic models.
+The Ensemble greatly outperforms the baseline model and the basic classifiers. The metric of importance here is precision, the fraction of declared positives (classified as Negative Reactions) that are true positives (actual Negative reactions). The higher this measure is, the better this tool is. We want an aid that will highlight comments for additional moderation. To avoid wasting the moderators' time, we want to avoid false positives (falsely classifying a comment as a Negative Reaction when it is not), and precision tells us how well we are doing. Secondary to this is Recall, how many of the Negative Reactions our model is catching. In both metrics, the Ensemble greatly outperforms the baselines and basic models.
 
 ## Future Work
 There is some information that I feel is not being captured by the features I've chosen. In addition to vocabulary, I could look for phrases (n-grams). I could also include information about a parent comment (either its own contents, or some metadata such as how far apart in time the two comments were made). I could also do some categorizing by subreddit (which community the discussion is taking place in has a large effect on the social norms of discourse). Finally, I'd like to experiment with different ensemble makeups - for instance, 1 tier per label type. Time constraints mean that this project still has unrealized potential that might be of interest.
